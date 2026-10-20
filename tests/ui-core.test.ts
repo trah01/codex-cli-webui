@@ -1,0 +1,96 @@
+import { describe, expect, test } from "bun:test";
+import { DEFAULT_TURN_PAGE_SIZE, applyComposerSuggestion, createLatestRequestGate, createTurnWindow, filterAppModels, getComposerAutocomplete, resolveComposerPlaceholder, selectModelState } from "../public/ui-core.js";
+
+describe("conversation turn window", () => {
+  test("uses a small default page for fast first paint", () => {
+    expect(DEFAULT_TURN_PAGE_SIZE).toBe(20);
+  });
+
+  test("opens a long conversation with only the newest turns", () => {
+    const turns = Array.from({ length: 2693 }, (_, i) => ({ id: `turn-${i}` }));
+    const view = createTurnWindow(turns, 80);
+    expect(view.visible).toHaveLength(80);
+    expect(view.visible[0].id).toBe("turn-2613");
+    expect(view.hiddenCount).toBe(2613);
+  });
+
+  test("loads an older page without losing the newest turns", () => {
+    const turns = Array.from({ length: 200 }, (_, i) => ({ id: `turn-${i}` }));
+    const first = createTurnWindow(turns, 80);
+    const second = createTurnWindow(turns, 80, first.start, 80);
+    expect(second.visible).toHaveLength(160);
+    expect(second.visible[0].id).toBe("turn-40");
+    expect(second.visible.at(-1)?.id).toBe("turn-199");
+    expect(second.hiddenCount).toBe(40);
+  });
+});
+
+describe("latest request gate", () => {
+  test("invalidates an older async response when a new request starts", () => {
+    const gate = createLatestRequestGate();
+    const oldRequest = gate.next();
+    const currentRequest = gate.next();
+    expect(gate.isCurrent(oldRequest)).toBe(false);
+    expect(gate.isCurrent(currentRequest)).toBe(true);
+  });
+});
+
+describe("model selection", () => {
+  test("keeps only GPT models for the desktop model picker", () => {
+    const models = [
+      { model: "gpt-6-astra", displayName: "GPT-6-Astra" },
+      { model: "o3", displayName: "o3" },
+      { model: "codex-mini", displayName: "Codex Mini" },
+      { id: "gpt-6.1-sol", displayName: "GPT-6.1-Sol" },
+    ];
+    expect(filterAppModels(models).map((model) => model.model || model.id)).toEqual(["gpt-6-astra", "gpt-6.1-sol"]);
+  });
+
+  test("selects a model and its advertised default effort", () => {
+    const models = [
+      { model: "gpt-6-luna", defaultReasoningEffort: "medium", supportedReasoningEfforts: [{ reasoningEffort: "medium" }] },
+      { model: "gpt-6.1-sol", defaultReasoningEffort: "low", supportedReasoningEfforts: [{ reasoningEffort: "low" }, { reasoningEffort: "xhigh" }] },
+    ];
+    expect(selectModelState(models, "gpt-6.1-sol")).toEqual({ model: "gpt-6.1-sol", effort: "low", efforts: ["low", "xhigh"] });
+  });
+
+  test("falls back to the catalog default when saved model is missing", () => {
+    const models = [
+      { model: "gpt-6-astra", isDefault: true, defaultReasoningEffort: "medium", supportedReasoningEfforts: [{ reasoningEffort: "medium" }] },
+    ];
+    expect(selectModelState(models, "removed-model").model).toBe("gpt-6-astra");
+  });
+});
+
+describe("composer placeholder", () => {
+  test("matches the native state priority and follow-up variants", () => {
+    expect(resolveComposerPlaceholder({ isGoalModeActive: true, isPlanModeActive: true })).toBe("Describe your goal, define measurable outcomes for best results");
+    expect(resolveComposerPlaceholder({ isPlanModeActive: true })).toBe("Describe your task to generate a plan...");
+    expect(resolveComposerPlaceholder({ placeholderText: "Waiting for worktree setup…" })).toBe("Waiting for worktree setup…");
+    expect(resolveComposerPlaceholder({ followUpType: "local", composerMode: "local" })).toBe("Ask for follow-up changes");
+    expect(resolveComposerPlaceholder({ followUpType: "local", composerMode: "local", isBackgroundSubagentsPanelVisible: true })).toBe("Ask for follow up changes or @ to tag an agent");
+    expect(resolveComposerPlaceholder({ followUpType: "cloud", composerMode: "local" })).toBe("Create a new local task that references this cloud task");
+    expect(resolveComposerPlaceholder({ followUpType: "cloud", composerMode: "cloud", cloudStartingState: "working-tree" })).toBe("Create a new cloud task that includes your current code and will reference this task");
+    expect(resolveComposerPlaceholder({ composerMode: "cloud" })).toBe("Ask Codex to do anything in the cloud");
+    expect(resolveComposerPlaceholder({ isHome: true, composerMode: "local" })).toBe("Do anything");
+  });
+});
+
+describe("composer autocomplete", () => {
+  test("recognizes slash commands only in the leading composer token", () => {
+    expect(getComposerAutocomplete("/pla", 4)).toEqual({ type: "slash", query: "pla", start: 0, end: 4 });
+    expect(getComposerAutocomplete("  /model", 8)).toEqual({ type: "slash", query: "model", start: 2, end: 8 });
+    expect(getComposerAutocomplete("explain /plan", 13)).toBeNull();
+  });
+
+  test("recognizes an at mention at the cursor and replaces only that token", () => {
+    const match = getComposerAutocomplete("review @pack next", 12);
+    expect(match).toEqual({ type: "mention", query: "pack", start: 7, end: 12 });
+    expect(applyComposerSuggestion("review @pack next", match!, "@package.json")).toEqual({ text: "review @package.json next", cursor: 20 });
+  });
+
+  test("adds a trailing space when completing at the end", () => {
+    const slash = getComposerAutocomplete("/plan", 5)!;
+    expect(applyComposerSuggestion("/plan", slash, "/plan")).toEqual({ text: "/plan ", cursor: 6 });
+  });
+});

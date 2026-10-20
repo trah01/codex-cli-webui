@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<script>if(matchMedia('(pointer:coarse)').matches||navigator.maxTouchPoints>0)document.documentElement.classList.add('mobile-device')</script>
+<meta name="theme-color" content="#181818">
+<title>Codex WebUI</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/style.css">
+<script src="/auth-bootstrap.js" type="module"></script>
+</head>
+<body>
+<section class="password-gate" id="passwordGate" aria-label="Codex WebUI login" hidden>
+  <form class="password-login" id="passwordLoginForm">
+    <span id="passwordCodexMark"></span>
+    <h1 id="passwordTitle">Log in</h1>
+    <label class="sr-only" for="passwordInput">Password</label>
+    <input id="passwordInput" type="password" placeholder="Password" autocomplete="current-password" required>
+    <label class="sr-only" for="passwordConfirmInput">Confirm password</label>
+    <input id="passwordConfirmInput" type="password" placeholder="Confirm password" autocomplete="new-password" required hidden>
+    <div class="password-error" id="passwordError" role="alert" hidden></div>
+    <button id="passwordLoginButton" type="submit">Log in</button>
+  </form>
+</section>
+<div id="app" class="app-shell">
+  <header class="topbar">
+    <div class="window-brand"><span id="windowCodexMark"></span><strong>Codex</strong></div>
+    <div class="thread-heading"><span id="threadTitle">New task</span><span id="threadPath"></span></div>
+    <div class="top-actions">
+      <button class="icon-button" id="toggleSidebar" title="Toggle sidebar" aria-controls="sidebar" aria-expanded="true" aria-pressed="true"><span class="icon-slot" data-icon="panelLeft"></span></button>
+      <button class="icon-button" id="toggleBottomPanel" title="Toggle terminal panel" aria-controls="bottomPanel" aria-expanded="false" aria-pressed="false"><span class="icon-slot" data-icon="panelBottom"></span></button>
+      <button class="icon-button" id="toggleSummaryPanel" title="Toggle summary" aria-controls="summaryPanel" aria-expanded="false" aria-pressed="false"><span class="icon-slot" data-icon="info"></span></button>
+      <button class="icon-button" id="toggleSidePanel" title="Toggle side panel" aria-controls="sidePanel" aria-expanded="false" aria-pressed="false"><span class="icon-slot" data-icon="panelRight"></span></button>
+    </div>
+  </header>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-top">
+      <div class="sidebar-mode-row">
+        <button class="sidebar-product" id="productModeButton" type="button" aria-label="Switch mode, current mode: Codex"><strong>Codex</strong><span class="icon-slot chevron" data-icon="chevronDown"></span></button>
+        <button class="sidebar-toolbar-button" id="sidebarSearchButton" type="button" title="Search" aria-label="Search chats" aria-expanded="false" aria-controls="sidebarSearchPanel"><span class="icon-slot" data-icon="search"></span></button>
+      </div>
+      <div class="sidebar-search-panel" id="sidebarSearchPanel" hidden>
+        <label class="sidebar-search-field"><span class="icon-slot" data-icon="search"></span><input id="threadSearch" type="search" placeholder="Search chats" aria-label="Search chats"></label>
+        <button class="sidebar-search-close" id="sidebarSearchClose" type="button" title="Close search" aria-label="Close search"><span class="icon-slot" data-icon="x"></span></button>
+      </div>
+      <button class="sidebar-row new-task" id="newTask"><span class="icon-slot" data-icon="plus"></span><span>New chat</span><kbd>⌘K</kbd></button>
+    </div>
+    <div class="sidebar-scroll">
+      <span id="projectName" hidden>codex-webui</span><span id="projectPath" hidden>~/projects/codex-webui</span>
+      <button class="sidebar-row projects-button" id="projectButton" type="button"><span class="icon-slot" data-icon="folderOpen"></span><span>Projects</span></button>
+      <div class="thread-list" id="threadList"><div class="list-state">Connecting to Codex…</div></div>
+    </div>
+    <div class="sidebar-footer">
+      <div class="account-menu" id="accountMenu" hidden>
+        <div class="account-menu-identity"><span class="account-menu-avatar account-initials" id="accountMenuAvatar">?</span><span><strong id="accountMenuName">Settings</strong><small id="accountMenuSubtitle"></small></span></div>
+        <div class="account-menu-separator"></div>
+        <button type="button" class="account-menu-row" id="accountProfile"><span class="icon-slot" data-icon="userRound"></span><span>Profile</span></button>
+        <button type="button" class="account-menu-row" id="accountUsage"><span class="icon-slot" data-icon="info"></span><span>Usage</span></button>
+        <button type="button" class="account-menu-row" id="accountSettings"><span class="icon-slot" data-icon="wrench"></span><span>Settings</span></button>
+        <button type="button" class="account-menu-row" id="accountShortcuts"><span class="icon-slot" data-icon="command"></span><span>Keyboard shortcuts</span></button>
+        <div class="account-menu-separator"></div>
+        <div class="account-menu-status"><span class="status-dot" id="statusDot"></span><span id="statusText">Connecting</span></div>
+        <button type="button" class="account-menu-row" id="accountLogout"><span class="icon-slot" data-icon="logOut"></span><span>Log out</span></button>
+      </div>
+      <div class="sidebar-footer-row">
+        <button class="account-button" id="accountButton" type="button" aria-expanded="false" aria-controls="accountMenu">
+          <span class="account-avatar account-initials" id="accountAvatar">?</span>
+          <span class="account-button-copy"><strong id="accountName">Settings</strong><small id="accountFooterMeta" aria-hidden="true"></small></span>
+        </button>
+        <button class="sidebar-help-button" id="sidebarHelpButton" type="button" title="Help" aria-label="Help" aria-expanded="false" aria-controls="sidebarHelpMenu"><span class="icon-slot" data-icon="circleHelp"></span></button>
+      </div>
+      <div class="sidebar-help-menu" id="sidebarHelpMenu" hidden>
+        <button type="button" id="sidebarHelpSettings"><span class="icon-slot" data-icon="wrench"></span><span>Settings</span></button>
+        <button type="button" id="sidebarHelpShortcuts"><span class="icon-slot" data-icon="command"></span><span>Keyboard shortcuts</span></button>
+        <a href="https://developers.openai.com/codex/" target="_blank" rel="noopener noreferrer"><span class="icon-slot" data-icon="circleHelp"></span><span>Help</span></a>
+      </div>
+      <span id="threadSource" hidden>local</span>
+    </div>
+  </aside>
+
+  <main class="conversation-shell">
+    <section class="conversation" id="conversation">
+      <div class="empty-state" id="emptyState">
+        <span id="emptyCodexMark"></span>
+        <h1>What can I help?</h1>
+      </div>
+    </section>
+    <div class="composer-dock">
+      <form class="composer" id="composer">
+        <div class="composer-autocomplete" id="composerAutocomplete" role="listbox" aria-label="Composer suggestions" hidden></div>
+        <div class="composer-context-tray" id="composerContextTray" aria-label="Attached context" hidden></div>
+        <textarea id="prompt" rows="1" placeholder="Do anything" aria-label="Task prompt"></textarea>
+        <div class="composer-footer">
+          <div class="composer-left">
+            <button type="button" class="composer-circle-button add-control" data-composer-control="add" title="Attach files and folders" aria-label="Attach files and folders"><span class="icon-slot" data-icon="plus"></span></button>
+            <button type="button" class="composer-text-button composer-project-control" id="composerProjectButton" data-composer-control="project" aria-label="Project"><span class="icon-slot" data-icon="folderOpen"></span><span id="composerProjectLabel">codex-webui</span><span class="icon-slot chevron" data-icon="chevronDown"></span></button>
+            <div class="permission-picker" id="permissionPicker" data-composer-control="approval">
+              <button type="button" class="composer-text-button approval-control" id="modeButton" title="Change permissions" aria-haspopup="menu" aria-expanded="false"><span class="icon-slot" data-icon="shield"></span><span class="control-label">Ask for approval</span><span class="icon-slot chevron" data-icon="chevronDown"></span></button>
+              <div class="permission-menu" id="permissionMenu" role="menu" aria-label="How should Codex actions be approved?" hidden>
+                <div class="permission-options" id="permissionOptions"></div>
+              </div>
+            </div>
+            <div class="model-picker composer-model-control" id="modelPicker" data-composer-control="model">
+              <button type="button" class="composer-text-button model-trigger" id="modelButton" data-codex-intelligence-trigger aria-haspopup="menu" aria-expanded="false"><span id="modelLabel">Loading models…</span><span id="effortLabel">Medium</span><span class="icon-slot chevron" data-icon="chevronDown"></span></button>
+              <div class="model-menu" id="modelMenu" role="menu" hidden></div>
+              <select id="effortSelect" class="sr-only" aria-label="Reasoning effort"><option value="medium">medium</option></select>
+            </div>
+          </div>
+          <div class="composer-right">
+            <span class="context-usage" id="contextUsage" role="img" tabindex="0" aria-label="Context usage" hidden>
+              <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+                <circle class="context-usage-track" cx="6" cy="6" r="5" pathLength="100"></circle>
+                <circle class="context-usage-progress" cx="6" cy="6" r="5" pathLength="100"></circle>
+              </svg>
+            </span>
+            <button type="button" class="composer-circle-button dictation-control" data-composer-control="dictation" title="Start dictation" aria-label="Start dictation"><span class="icon-slot" data-icon="mic"></span></button>
+            <button class="send-button" id="sendButton" data-composer-control="send" type="submit" title="Send message" aria-label="Send message"><span class="icon-slot" data-icon="arrowUp"></span></button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </main>
+
+  <aside class="side-panel" id="sidePanel" hidden>
+    <div class="side-panel-toolbar">
+      <div class="side-panel-tabs" role="tablist" aria-label="Task side panel">
+        <button class="side-panel-tab active" id="newTab" type="button" role="tab" aria-selected="true" data-side-panel-tab="launcher">New tab</button>
+        <button class="side-panel-tab" id="reviewTab" type="button" role="tab" aria-selected="false" data-side-panel-tab="review" hidden>Review <span id="changeCount">0</span></button>
+        <button class="side-panel-tab" id="utilityTab" type="button" role="tab" aria-selected="false" data-side-panel-tab="utility" hidden></button>
+      </div>
+      <div class="side-panel-tools">
+        <button class="icon-button small" id="openSidePanelTab" type="button" title="Open side panel tab"><span class="icon-slot" data-icon="plus"></span></button>
+        <button class="icon-button small" title="Close panel" id="closeSidePanel" type="button"><span class="icon-slot" data-icon="x"></span></button>
+      </div>
+    </div>
+    <span class="sr-only" id="sidePanelTitle">New tab</span>
+    <section class="side-panel-launcher" id="sidePanelLauncher" role="tabpanel">
+      <div class="side-panel-launcher-list">
+        <button class="side-panel-launcher-action" type="button" data-side-panel-action="review"><span class="icon-slot" data-icon="fileDiff"></span><span>Review</span></button>
+        <button class="side-panel-launcher-action" type="button" data-side-panel-action="terminal"><span class="icon-slot" data-icon="terminal"></span><span>Terminal</span></button>
+        <button class="side-panel-launcher-action" type="button" data-side-panel-action="browser"><span class="icon-slot" data-icon="globe"></span><span>Browser</span></button>
+        <button class="side-panel-launcher-action" type="button" data-side-panel-action="files"><span class="icon-slot" data-icon="folderOpen"></span><span>Files</span></button>
+        <button class="side-panel-launcher-action" type="button" data-side-panel-action="side-task"><span class="icon-slot" data-icon="messageSquare"></span><span>Side task</span></button>
+      </div>
+    </section>
+    <section class="review-panel-content" id="reviewPanelContent" role="tabpanel" hidden>
+      <div id="changesPanel">
+        <div class="change-summary"><span id="changeSummary">No changes yet</span><span class="review-stats" id="reviewStats"></span><button class="icon-button small" title="Toggle word wrap" id="reviewWrap"><span class="icon-slot" data-icon="wrapText"></span></button><button class="icon-button small" title="Collapse all diffs" id="reviewExpand"><span class="icon-slot" data-icon="chevronsUp"></span></button><button class="icon-button small" title="Switch to split diff" id="reviewMode"><span class="icon-slot" data-icon="columns2"></span></button><button class="icon-button small" title="Undo changes" id="reviewPatch"><span class="icon-slot" data-icon="undo"></span></button></div>
+        <div class="change-list" id="changeList"><div class="panel-empty">Changes made by Codex will appear here.</div></div>
+      </div>
+    </section>
+    <section class="side-panel-browser" id="browserPanel" role="tabpanel" hidden aria-label="Browser">
+      <div class="browser-toolbar">
+        <div class="browser-nav" aria-label="Browser navigation">
+          <button class="icon-button small" id="browserBack" type="button" title="Go back" aria-label="Go back" disabled><span class="icon-slot" data-icon="chevronLeft"></span></button>
+          <button class="icon-button small" id="browserForward" type="button" title="Go forward" aria-label="Go forward" disabled><span class="icon-slot" data-icon="chevronRight"></span></button>
+          <button class="icon-button small" id="browserRefresh" type="button" title="Refresh page" aria-label="Refresh page" disabled><span class="icon-slot" data-icon="refreshCw"></span></button>
+        </div>
+        <form class="browser-address-form" id="browserAddressForm">
+          <span class="icon-slot" data-icon="globe" aria-hidden="true"></span>
+          <label class="sr-only" for="browserUrl">Browser URL</label>
+          <input id="browserUrl" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="Enter URL" aria-describedby="browserStatusText">
+          <button class="browser-go" type="submit" title="Go to URL" aria-label="Go to URL"><span class="icon-slot" data-icon="arrowUp"></span></button>
+        </form>
+        <a class="icon-button small browser-external" id="browserOpenExternal" title="Open in new tab" aria-label="Open in new tab" target="_blank" rel="noopener noreferrer" hidden><span class="icon-slot" data-icon="monitor"></span></a>
+      </div>
+      <div class="browser-status" id="browserStatus" role="status" aria-live="polite">
+        <span class="browser-status-dot" aria-hidden="true"></span><span id="browserStatusText">Ready</span>
+      </div>
+      <div class="browser-frame-shell" id="browserFrameShell">
+        <div class="browser-empty" id="browserEmpty"><span class="icon-slot" data-icon="globe"></span><strong>Enter a URL to browse</strong><span>Pages stay in their original site context. Some sites do not allow embedding.</span></div>
+        <iframe id="browserFrame" title="Embedded browser page" loading="eager" referrerpolicy="no-referrer-when-downgrade" sandbox="allow-downloads allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-presentation allow-scripts" hidden></iframe>
+        <div class="browser-loading" id="browserLoading" hidden><span class="icon-slot" data-icon="loaderCircle"></span><span>Loading page…</span></div>
+      </div>
+      <div class="browser-notice" id="browserNotice" role="alert" hidden>
+        <span class="icon-slot" data-icon="triangleAlert"></span>
+        <div><strong id="browserNoticeTitle">Page could not be embedded</strong><p id="browserNoticeDescription"></p></div>
+        <a id="browserNoticeExternal" target="_blank" rel="noopener noreferrer" hidden>Open externally</a>
+      </div>
+    </section>
+    <section class="side-panel-terminal" id="sideTerminalPanel" role="tabpanel" hidden aria-label="Terminal">
+      <div class="terminal-host side-terminal-host" id="sideTerminalHost" data-connected="false"></div>
+    </section>
+    <section class="side-task-panel" id="sideTaskPanel" role="tabpanel" hidden aria-label="Side tasks">
+      <div class="side-task-list" id="sideTaskList"><div class="side-task-empty">Side tasks started by this chat will appear here.</div></div>
+    </section>
+    <section class="side-panel-utility" id="utilityPanelContent" role="tabpanel" hidden>
+      <div class="side-panel-utility-empty"><span class="icon-slot" id="utilityPanelIcon"></span><h2 id="utilityPanelTitle"></h2><p id="utilityPanelDescription"></p><button id="utilityPanelAction" type="button" hidden></button></div>
+    </section>
+  </aside>
+  <aside class="summary-panel" id="summaryPanel" hidden>
+    <div class="summary-panel-toolbar"><strong>Summary</strong><button class="icon-button small" title="Close summary" id="closeSummaryPanel" type="button"><span class="icon-slot" data-icon="x"></span></button></div>
+    <div class="summary-panel-scroll">
+      <section class="summary-section">
+        <h2 class="summary-section-title">Environment</h2>
+        <div class="summary-row"><span class="icon-slot" data-icon="folderOpen"></span><span id="summaryWorkspace">codex-webui</span></div>
+        <div class="summary-row"><span class="icon-slot" data-icon="gitBranch"></span><span id="summaryBranch">Local workspace</span></div>
+      </section>
+      <section class="summary-section">
+        <h2 class="summary-section-title">Scheduled</h2>
+        <div class="summary-empty">Scheduled task data requires the native desktop bridge.</div>
+      </section>
+      <section class="summary-section">
+        <h2 class="summary-section-title">Computer Use</h2>
+        <div class="summary-empty">Computer Use controls require the native desktop bridge.</div>
+      </section>
+      <section class="summary-section">
+        <h2 class="summary-section-title">Plan</h2>
+        <div class="summary-empty" id="summaryPlan">Plan data is not exposed by app-server.</div>
+      </section>
+      <section class="summary-section">
+        <h2 class="summary-section-title">Side tasks</h2>
+        <div class="summary-empty" id="summarySideTasks">Side task data requires the native desktop bridge.</div>
+      </section>
+      <section class="summary-section">
+        <h2 class="summary-section-title">Sources</h2>
+        <div class="summary-empty" id="summarySource">Conversation source data is not exposed by app-server.</div>
+      </section>
+    </div>
+  </aside>
+  <section class="bottom-panel" id="bottomPanel" aria-label="Bottom panel" hidden>
+    <div class="bottom-panel-tabs"><button class="bottom-panel-tab active" id="bottomPanelTab" type="button">New tab</button><button class="icon-button small" id="closeBottomPanel" type="button" title="Close bottom panel"><span class="icon-slot" data-icon="x"></span></button></div>
+    <div class="bottom-panel-launcher" id="bottomPanelLauncher"><button type="button" data-bottom-panel-action="terminal"><span class="icon-slot" data-icon="terminal"></span><span>Terminal</span></button><button type="button" data-bottom-panel-action="browser"><span class="icon-slot" data-icon="globe"></span><span>Browser</span></button><button type="button" data-bottom-panel-action="files"><span class="icon-slot" data-icon="folderOpen"></span><span>Files</span></button></div>
+    <div class="terminal-host" id="terminalHost" data-connected="false" hidden></div>
+    <div class="bottom-panel-utility" id="bottomPanelUtility" hidden><span class="icon-slot" id="bottomPanelIcon"></span><div><h2 id="bottomPanelUtilityTitle"></h2><p id="bottomPanelDescription"></p></div><button id="bottomPanelAction" type="button" hidden></button></div>
+  </section>
+</div>
+<dialog class="folder-dialog" id="folderDialog">
+  <form method="dialog" class="folder-card">
+    <div class="folder-head"><div><strong>Project</strong><span>Choose where new tasks should work.</span></div><button class="icon-button" value="cancel" aria-label="Close"><span class="icon-slot" data-icon="x"></span></button></div>
+    <button type="button" class="projectless-option" id="projectlessOption"><span class="icon-slot" data-icon="messageSquare"></span><span><strong>None</strong><small>Don't work in a project</small></span><span class="projectless-check icon-slot" data-icon="check"></span></button>
+    <div class="folder-path-row"><button type="button" class="icon-button" id="folderUp" title="Parent folder"><span class="icon-slot" data-icon="arrowUp"></span></button><input id="folderPathInput" spellcheck="false" autocomplete="off"><button type="button" class="folder-go" id="folderGo">Go</button></div>
+    <div class="folder-list" id="folderList"><div class="list-state">Loading folders…</div></div>
+    <div class="folder-actions"><span id="folderSelection">No folder selected</span><button value="cancel" class="folder-cancel">Cancel</button><button type="button" class="folder-confirm" id="folderConfirm" disabled>Use this folder</button></div>
+  </form>
+</dialog>
+<dialog class="settings-dialog" id="settingsDialog" aria-labelledby="settingsTitle">
+  <div class="settings-card">
+    <aside class="settings-nav" aria-label="Settings">
+      <strong class="sr-only" id="settingsTitle">Settings</strong>
+      <div class="settings-nav-toolbar-spacer" aria-hidden="true"></div>
+      <button class="settings-nav-back" id="closeSettingsNav" type="button"><span class="icon-slot" data-icon="chevronLeft"></span><span>Back to app</span></button>
+      <label class="settings-search"><span class="icon-slot" data-icon="search"></span><input id="settingsSearch" type="search" aria-label="Search settings" placeholder="Search settings…" autocomplete="off"><button class="settings-search-clear icon-button small" id="clearSettingsSearch" type="button" aria-label="Clear settings search" hidden><span class="icon-slot" data-icon="x"></span></button></label>
+      <div class="settings-nav-scroll" id="settingsNavScroll">
+        <section class="settings-nav-group" data-settings-group="personal"><h2>Personal</h2><button type="button" class="active" data-settings-page="general-settings"><span class="icon-slot" data-icon="wrench"></span><span>General</span></button><button type="button" data-settings-page="appearance"><span class="icon-slot" data-icon="monitor"></span><span>Appearance</span></button><button type="button" data-settings-page="agent"><span class="icon-slot" data-icon="terminal"></span><span>Configuration</span></button><button type="button" data-settings-page="profile"><span class="icon-slot" data-icon="userRound"></span><span>Profile</span></button><button type="button" data-settings-page="keyboard-shortcuts"><span class="icon-slot" data-icon="command"></span><span>Keyboard shortcuts</span></button></section>
+        <section class="settings-nav-group" data-settings-group="integrations"><h2>Integrations</h2><button type="button" data-settings-page="plugins-settings"><span class="icon-slot" data-icon="wrench"></span><span>Plugins</span></button><button type="button" data-settings-page="skills-settings"><span class="icon-slot" data-icon="file"></span><span>Skills</span></button><button type="button" data-settings-page="browser-use"><span class="icon-slot" data-icon="globe"></span><span>Browser</span></button><button type="button" data-settings-page="computer-use"><span class="icon-slot" data-icon="monitor"></span><span>Computer use</span></button></section>
+        <section class="settings-nav-group" data-settings-group="coding"><h2>Coding</h2><button type="button" data-settings-page="connections"><span class="icon-slot" data-icon="monitor"></span><span>Connections</span></button><button type="button" data-settings-page="cloud-settings"><span class="icon-slot" data-icon="globe"></span><span>Cloud preferences</span></button><button type="button" data-settings-page="cloud-environments"><span class="icon-slot" data-icon="globe"></span><span>Cloud environments</span></button><button type="button" data-settings-page="code-review"><span class="icon-slot" data-icon="fileDiff"></span><span>Code review</span></button><button type="button" data-settings-page="git-settings"><span class="icon-slot" data-icon="gitBranch"></span><span>Git</span></button><button type="button" data-settings-page="hooks-settings"><span class="icon-slot" data-icon="wrench"></span><span>Hooks</span></button><button type="button" data-settings-page="worktrees"><span class="icon-slot" data-icon="list"></span><span>Worktrees</span></button></section>
+        <section class="settings-nav-group" data-settings-group="archived"><h2>Archived</h2><button type="button" data-settings-page="data-controls"><span class="icon-slot" data-icon="list"></span><span>Archived chats</span></button></section>
+        <div class="settings-nav-empty" id="settingsNavEmpty" hidden>No results found</div>
+      </div>
+    </aside>
+    <main class="settings-content" id="settingsContent">
+      <section class="settings-page" data-settings-content="general-settings">
+        <header class="settings-page-heading"><button class="settings-mobile-back icon-button" id="settingsMobileBack" type="button" aria-label="Back to settings"><span class="icon-slot" data-icon="chevronLeft"></span></button><h1 id="settingsPageTitle">General</h1></header>
+        <div class="settings-section-title">Permissions</div>
+        <label class="settings-row settings-toggle-row" id="settingsAutoReviewRow">
+          <span><strong>Auto-review</strong><small>Show “Approve for me” in the composer</small></span>
+          <input id="settingsAutoReviewToggle" type="checkbox">
+          <span class="settings-switch" aria-hidden="true"></span>
+        </label>
+        <label class="settings-row settings-toggle-row" id="settingsFullAccessRow">
+          <span><strong>Full access</strong><small>Show unrestricted access in the composer</small></span>
+          <input id="settingsFullAccessToggle" type="checkbox">
+          <span class="settings-switch" aria-hidden="true"></span>
+        </label>
+        <div class="settings-row"><span><strong>Selected mode</strong><small>Permission mode used for new turns</small></span><span id="settingsPermissionValue">Ask for approval</span></div>
+        <div class="settings-row"><span><strong>Project</strong><small>Working folder used for new chats</small></span><span id="settingsProjectValue"></span></div>
+        <div class="settings-section-title settings-section-spaced">Notifications</div>
+        <label class="settings-row settings-toggle-row" id="settingsTaskNotifyRow">
+          <span><strong>Task notifications</strong><small>Show a browser notification when a task completes</small></span>
+          <input id="settingsTaskNotifyToggle" type="checkbox">
+          <span class="settings-switch" aria-hidden="true"></span>
+        </label>
+        <div class="settings-section-title settings-section-spaced">Appearance</div>
+        <label class="settings-row settings-select-row"><span><strong>Language</strong><small>Interface language</small></span><select class="settings-select" id="languageSelect"><option value="system">System default</option><option value="zh-CN">简体中文</option><option value="en">English</option></select></label>
+      </section>
+      <section class="settings-page" data-settings-content="profile" hidden><header class="settings-page-heading"><button class="settings-mobile-back icon-button" type="button" aria-label="Back to settings"><span class="icon-slot" data-icon="chevronLeft"></span></button><h1>Profile</h1></header><div class="settings-account-identity"><span class="account-avatar account-initials" id="settingsAccountAvatar">?</span><span><strong id="settingsAccountName">Settings</strong><small id="settingsAccountMeta"></small></span></div></section>
+      <section class="settings-page" data-settings-content="keyboard-shortcuts" hidden><header class="settings-page-heading"><button class="settings-mobile-back icon-button" type="button" aria-label="Back to settings"><span class="icon-slot" data-icon="chevronLeft"></span></button><h1>Keyboard shortcuts</h1></header><div class="shortcut-row"><span>New chat</span><kbd>⌘ K</kbd></div><div class="shortcut-row"><span>Toggle sidebar</span><kbd>⌘ B</kbd></div><div class="shortcut-row"><span>Toggle bottom panel</span><kbd>⌘ J</kbd></div></section>
+      <section class="settings-page" data-settings-content="placeholder" hidden><header class="settings-page-heading"><button class="settings-mobile-back icon-button" type="button" aria-label="Back to settings"><span class="icon-slot" data-icon="chevronLeft"></span></button><h1 id="settingsPlaceholderTitle"></h1></header><small id="settingsPlaceholderDescription" hidden></small><div id="settingsPlaceholderRows"></div></section>
+    </main>
+  </div>
+</dialog>
+<dialog class="permission-confirm-dialog" id="fullAccessDialog" aria-labelledby="fullAccessTitle">
+  <form method="dialog" class="permission-confirm-card">
+    <div class="permission-confirm-head"><span class="icon-slot" data-icon="triangleAlert"></span><div><strong id="fullAccessTitle">Turn on Full Access?</strong><p>Codex will be able to run commands, use the internet, and create and edit files anywhere on this computer without your permission.</p></div></div>
+    <div class="permission-risk-list">
+      <div><span class="icon-slot" data-icon="file"></span><span><strong>Files and folders</strong><small>Read, create, modify, upload, or delete files anywhere on this computer</small></span></div>
+      <div><span class="icon-slot" data-icon="terminal"></span><span><strong>Terminal commands</strong><small>Run commands, install software, and change system settings</small></span></div>
+      <div><span class="icon-slot" data-icon="globe"></span><span><strong>Internet and connected apps</strong><small>Access websites, send data, and use enabled plugins</small></span></div>
+    </div>
+    <div class="permission-confirm-actions"><button value="cancel">Cancel</button><button type="button" class="danger" id="confirmFullAccess">Confirm</button></div>
+  </form>
+</dialog>
+<dialog class="image-viewer" id="imageViewer" aria-labelledby="imageViewerTitle">
+  <div class="image-viewer-card">
+    <div class="image-viewer-toolbar">
+      <div class="image-viewer-heading"><strong id="imageViewerTitle">Image</strong><span id="imageViewerPath"></span></div>
+      <a class="image-viewer-original" id="imageViewerOriginal" target="_blank" rel="noopener noreferrer">Open original</a>
+      <button class="icon-button" id="closeImageViewer" type="button" aria-label="Close image viewer"><span class="icon-slot" data-icon="x"></span></button>
+    </div>
+    <div class="image-viewer-stage">
+      <img id="imageViewerImage" alt="">
+      <div class="image-viewer-error" id="imageViewerError" hidden>Image could not be loaded.</div>
+    </div>
+  </div>
+</dialog>
+<div class="toast" id="toast"></div>
+</body>
+</html>
