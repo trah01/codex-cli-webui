@@ -11,6 +11,9 @@ export function createSettingsEditor(context) {
   function row(container, label, control) {
     const node = document.createElement('label'), name = document.createElement('strong');
     node.className = 'settings-row settings-select-row'; name.textContent = t(label);
+    if (control.nodeType === 3) {
+      const value = document.createElement('span'); value.className = 'settings-row-value'; value.append(control); control = value;
+    }
     node.append(name, control); container.append(node); return node;
   }
   function select(container, label, values, value, change) {
@@ -45,16 +48,18 @@ export function createSettingsEditor(context) {
     const settings = await rpc('host/settings/read', { cwd: context.cwd() || undefined });
     if (current !== generation) return;
     loading.remove();
-    const saved = text(remote, 'Changes to Codex configuration apply to new chats.');
+    const actions = document.createElement('div'); actions.className = 'settings-actions';
+    const saved = text(actions, 'Changes to Codex configuration apply to new chats.'); saved.setAttribute('role', 'status');
     select(remote, 'Web search', [['disabled', 'Disabled'], ['cached', 'Cached search'], ['live', 'Live search']], settings.webSearch, async value => {
       await rpc('host/settings/write', { field: 'webSearch', value }); saved.textContent = t('Saved. Start a new chat to use this setting.');
     });
     const label = document.createElement('label'), title = document.createElement('strong'), input = document.createElement('textarea');
     label.className = 'settings-instructions'; title.textContent = t('Custom instructions'); input.value = settings.instructions; input.rows = 6; input.maxLength = 100000;
     label.append(title, input); remote.append(label);
-    button(remote, 'Save instructions', async () => {
+    button(actions, 'Save instructions', async () => {
       await rpc('host/settings/write', { field: 'instructions', value: input.value }); saved.textContent = t('Saved. Start a new chat to use this setting.');
     });
+    remote.append(actions);
   }
   function review(container) {
     const preferences = context.review();
@@ -68,15 +73,17 @@ export function createSettingsEditor(context) {
     if (current !== generation) return;
     loading.remove();
     const source = text(container, settings.path);
+    source.classList.add('settings-file-path');
     const label = document.createElement('label'), title = document.createElement('span'), input = document.createElement('textarea');
     label.className = 'settings-instructions settings-global-instructions';
     title.className = 'sr-only'; title.textContent = t('Global instructions');
     input.value = settings.instructions; input.rows = 16; input.spellcheck = false;
     label.append(title, input); container.append(label);
-    const status = text(container, ''); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
+    const actions = document.createElement('div'); actions.className = 'settings-actions'; container.append(actions);
+    const status = text(actions, ''); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
     let saving = false;
     const save = document.createElement('button');
-    save.type = 'button'; save.className = 'integration-refresh'; save.textContent = t('Save'); container.append(save);
+    save.type = 'button'; save.className = 'integration-refresh'; save.textContent = t('Save'); actions.append(save);
     save.onclick = async () => {
       saving = true; save.disabled = true; input.disabled = true; status.textContent = t('Saving…');
       try {

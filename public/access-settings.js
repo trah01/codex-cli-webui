@@ -16,7 +16,8 @@ export async function renderAccessSettings(container, t) {
   domainInput.autocapitalize = 'none'; domainInput.spellcheck = false;
   const domainButton = document.createElement('button'); domainButton.type = 'submit'; domainButton.className = 'integration-refresh'; domainButton.textContent = t('Save domain');
   const domainFeedback = document.createElement('p'); domainFeedback.className = 'settings-feedback'; domainFeedback.setAttribute('role', 'status');
-  domainLabel.append(domainTitle, domainInput); domainForm.append(domainLabel, domainButton, domainFeedback); container.append(domainForm);
+  const domainActions = document.createElement('div'); domainActions.className = 'settings-actions'; domainActions.append(domainFeedback, domainButton);
+  domainLabel.append(domainTitle, domainInput); domainForm.append(domainLabel, domainActions); container.append(domainForm);
   async function domainRequest(options = {}) {
     const response = await fetch('/api/auth/domain', { cache: 'no-store', ...options });
     const result = await response.json();
@@ -49,7 +50,8 @@ export async function renderAccessSettings(container, t) {
   const password = field('New password', 'password', 'new-password'); password.minLength = 12; password.maxLength = 256;
   const confirmation = field('Confirm password', 'password', 'new-password'); confirmation.minLength = 12; confirmation.maxLength = 256;
   const button = document.createElement('button'); button.type = 'submit'; button.className = 'integration-refresh'; button.textContent = t('Save account and password');
-  form.append(button); container.append(form);
+  const actions = document.createElement('div'); actions.className = 'settings-actions'; actions.append(feedback, button);
+  form.append(actions); container.append(form);
   form.onsubmit = async event => {
     event.preventDefault();
     if (password.value !== confirmation.value) { feedback.textContent = t('Passwords do not match'); confirmation.focus(); return; }
