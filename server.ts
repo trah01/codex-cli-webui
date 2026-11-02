@@ -76,9 +76,9 @@ const terminalSessions = new Map<WebSocket, ReturnType<typeof createTerminalSess
 const pending = new Map<number, { resolve: (value: any) => void; reject: (error: Error) => void }>();
 const reviewDiffs = new ReviewDiffStore();
 const liveSessions = new LiveSessionStore();
-const settingsService = createSettingsService(request);
+const settingsService = createSettingsService(request, { codexHome: () => resolve(codexSessionsRoot, "..") });
 const threadPaths = new Map<string, string>();
-let codexSessionsRoot = resolve(homeDir, ".codex", "sessions");
+let codexSessionsRoot = resolve(process.env.CODEX_HOME || resolve(homeDir, ".codex"), "sessions");
 let seq = 1;
 let connected = false;
 let shuttingDown = false;

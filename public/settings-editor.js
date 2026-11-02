@@ -62,6 +62,39 @@ export function createSettingsEditor(context) {
     select(container, 'Wrap lines', [['on', 'Enabled'], ['off', 'Disabled']], preferences.wrap ? 'on' : 'off', value => context.setReview('wrap', value === 'on'));
     select(container, 'Expand changes', [['on', 'Enabled'], ['off', 'Disabled']], preferences.expanded ? 'on' : 'off', value => context.setReview('expanded', value === 'on'));
   }
+  async function globalInstructions(container, current) {
+    const loading = text(container, 'Loading…');
+    let settings = await rpc('host/settings/read', { scope: 'global-instructions' });
+    if (current !== generation) return;
+    loading.remove();
+    const source = text(container, settings.path);
+    const label = document.createElement('label'), title = document.createElement('span'), input = document.createElement('textarea');
+    label.className = 'settings-instructions settings-global-instructions';
+    title.className = 'sr-only'; title.textContent = t('Global instructions');
+    input.value = settings.instructions; input.rows = 16; input.spellcheck = false;
+    label.append(title, input); container.append(label);
+    const status = text(container, ''); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
+    let saving = false;
+    const save = document.createElement('button');
+    save.type = 'button'; save.className = 'integration-refresh'; save.textContent = t('Save'); container.append(save);
+    save.onclick = async () => {
+      saving = true; save.disabled = true; input.disabled = true; status.textContent = t('Saving…');
+      try {
+        const result = await rpc('host/settings/write', { field: 'globalInstructions', value: input.value, version: settings.version });
+        if (current !== generation) return;
+        const fallback = result.path !== settings.path;
+        settings = result; input.value = result.instructions; source.textContent = result.path;
+        status.textContent = t(fallback ? 'Saved. The fallback global instructions are now active for new chats.' : 'Saved. Start a new chat to use this setting.');
+      } catch (error) {
+        if (current === generation) status.textContent = t(error.message);
+      } finally {
+        saving = false; input.disabled = false;
+        save.disabled = input.value === settings.instructions;
+      }
+    };
+    save.disabled = true;
+    input.oninput = () => { save.disabled = saving || input.value === settings.instructions; status.textContent = ''; };
+  }
   async function plugins(container, current) {
     const loading = text(container, 'Loading…');
     const result = await rpc('plugin/installed', { cwds: context.cwd() ? [context.cwd()] : [] });
@@ -100,6 +133,7 @@ export function createSettingsEditor(context) {
     try {
       if (page === 'access-settings') await renderAccessSettings(container, t);
       else if (page === 'agent') await configuration(container, current);
+      else if (page === 'global-instructions') await globalInstructions(container, current);
       else if (page === 'code-review') review(container);
       else if (page === 'plugins-settings') await plugins(container, current);
       else if (page === 'data-controls') await archived(container, current);

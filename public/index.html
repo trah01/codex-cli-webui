@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<script>if(matchMedia('(pointer:coarse)').matches||navigator.maxTouchPoints>0)document.documentElement.classList.add('mobile-device')</script>
+<script>if(matchMedia('(max-width:720px)').matches)document.documentElement.classList.add('mobile-device','mobile-layout')</script>
 <meta name="theme-color" content="#181818">
 <title>Codex WebUI</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -28,15 +28,18 @@
 <div id="app" class="app-shell">
   <header class="topbar">
     <div class="window-brand"><span id="windowCodexMark"></span><strong>Codex</strong></div>
-    <div class="thread-heading"><span id="threadTitle">New task</span><span id="threadPath"></span></div>
-    <div class="top-actions">
+    <button class="thread-heading" id="threadHeadingButton" type="button"><span id="threadTitle">New task</span><span id="threadPath"></span><span class="icon-slot mobile-only" data-icon="chevronDown" aria-hidden="true"></span></button>
+    <button class="icon-button mobile-only" id="mobileNewTask" type="button" title="New chat" aria-label="New chat"><span class="icon-slot" data-icon="plus"></span></button>
+    <button class="icon-button mobile-only" id="mobileToolsButton" type="button" title="More" aria-label="More" aria-expanded="false" aria-controls="topActions"><span class="icon-slot" data-icon="ellipsis"></span></button>
+    <div class="top-actions" id="topActions">
       <button class="icon-button" id="toggleSidebar" title="Toggle sidebar" aria-controls="sidebar" aria-expanded="true" aria-pressed="true"><span class="icon-slot" data-icon="panelLeft"></span></button>
-      <button class="icon-button" id="toggleBottomPanel" title="Toggle terminal panel" aria-controls="bottomPanel" aria-expanded="false" aria-pressed="false"><span class="icon-slot" data-icon="panelBottom"></span></button>
-      <button class="icon-button" id="toggleSummaryPanel" title="Toggle summary" aria-controls="summaryPanel" aria-expanded="false" aria-pressed="false"><span class="icon-slot" data-icon="info"></span></button>
-      <button class="icon-button" id="toggleSidePanel" title="Toggle side panel" aria-controls="sidePanel" aria-expanded="false" aria-pressed="false"><span class="icon-slot" data-icon="panelRight"></span></button>
+      <button class="icon-button" id="toggleBottomPanel" title="Toggle terminal panel" aria-controls="bottomPanel" aria-expanded="false" aria-pressed="false"><span class="icon-slot" data-icon="panelBottom"></span><span class="mobile-only">Terminal</span></button>
+      <button class="icon-button" id="toggleSummaryPanel" title="Toggle summary" aria-controls="summaryPanel" aria-expanded="false" aria-pressed="false"><span class="icon-slot" data-icon="info"></span><span class="mobile-only">Summary</span></button>
+      <button class="icon-button" id="toggleSidePanel" title="Toggle side panel" aria-controls="sidePanel" aria-expanded="false" aria-pressed="false"><span class="icon-slot" data-icon="panelRight"></span><span class="mobile-only">Tools</span></button>
     </div>
   </header>
 
+  <button class="sidebar-backdrop" id="sidebarBackdrop" type="button" aria-label="Close sidebar" hidden></button>
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-top">
       <div class="sidebar-mode-row">
@@ -82,6 +85,11 @@
   </aside>
 
   <main class="conversation-shell">
+    <div class="mobile-view-tabs mobile-only" role="tablist" aria-label="Chat views">
+      <button id="mobileChatTab" type="button" role="tab" aria-selected="true" aria-controls="conversation">Chat</button>
+      <button id="mobilePreviewTab" type="button" role="tab" aria-selected="false" aria-controls="mobilePreviewHost" tabindex="-1">Preview</button>
+    </div>
+    <section class="mobile-preview-host" id="mobilePreviewHost" role="tabpanel" aria-labelledby="mobilePreviewTab" hidden></section>
     <section class="conversation" id="conversation">
       <div class="empty-state" id="emptyState">
         <span id="emptyCodexMark"></span>
@@ -112,6 +120,7 @@
             </div>
           </div>
           <div class="composer-right">
+            <button class="composer-circle-button mobile-only" id="mobileUsageButton" type="button" title="Context usage" aria-label="Context usage" aria-expanded="false" aria-controls="mobileUsagePanel"><span class="icon-slot" data-icon="info"></span></button>
             <span class="context-usage" id="contextUsage" role="img" tabindex="0" aria-label="Context usage" hidden>
               <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
                 <circle class="context-usage-track" cx="6" cy="6" r="5" pathLength="100"></circle>
@@ -121,6 +130,11 @@
             <button class="send-button" id="sendButton" data-composer-control="send" type="submit" title="Send message" aria-label="Send message"><span class="icon-slot" data-icon="arrowUp"></span></button>
           </div>
         </div>
+        <section class="mobile-usage-panel" id="mobileUsagePanel" aria-label="Context usage" hidden>
+          <div class="mobile-usage-row"><span>Context usage</span><strong id="mobileUsageValue">No usage data yet</strong></div>
+          <div class="mobile-usage-track" aria-hidden="true"><span id="mobileUsageProgress"></span></div>
+          <div class="mobile-usage-row"><span>Model</span><span id="mobileUsageModel"></span></div>
+        </section>
       </form>
     </div>
   </main>
@@ -229,7 +243,7 @@
       <button class="settings-nav-back" id="closeSettingsNav" type="button"><span class="icon-slot" data-icon="chevronLeft"></span><span>Back to app</span></button>
       <label class="settings-search"><span class="icon-slot" data-icon="search"></span><input id="settingsSearch" type="search" aria-label="Search settings" placeholder="Search settings…" autocomplete="off"><button class="settings-search-clear icon-button small" id="clearSettingsSearch" type="button" aria-label="Clear settings search" hidden><span class="icon-slot" data-icon="x"></span></button></label>
       <div class="settings-nav-scroll" id="settingsNavScroll">
-        <section class="settings-nav-group" data-settings-group="personal"><h2>Personal</h2><button type="button" class="active" data-settings-page="general-settings"><span class="icon-slot" data-icon="wrench"></span><span>General</span></button><button type="button" data-settings-page="access-settings" data-settings-available="false" hidden><span class="icon-slot" data-icon="shield"></span><span>Public access</span></button><button type="button" data-settings-page="appearance"><span class="icon-slot" data-icon="monitor"></span><span>Appearance</span></button><button type="button" data-settings-page="agent"><span class="icon-slot" data-icon="terminal"></span><span>Configuration</span></button><button type="button" data-settings-page="profile"><span class="icon-slot" data-icon="userRound"></span><span>Profile</span></button><button type="button" data-settings-page="keyboard-shortcuts"><span class="icon-slot" data-icon="command"></span><span>Keyboard shortcuts</span></button></section>
+        <section class="settings-nav-group" data-settings-group="personal"><h2>Personal</h2><button type="button" class="active" data-settings-page="general-settings"><span class="icon-slot" data-icon="wrench"></span><span>General</span></button><button type="button" data-settings-page="access-settings" data-settings-available="false" hidden><span class="icon-slot" data-icon="shield"></span><span>Public access</span></button><button type="button" data-settings-page="appearance"><span class="icon-slot" data-icon="monitor"></span><span>Appearance</span></button><button type="button" data-settings-page="agent"><span class="icon-slot" data-icon="terminal"></span><span>Configuration</span></button><button type="button" data-settings-page="global-instructions"><span class="icon-slot" data-icon="file"></span><span>Global instructions</span></button><button type="button" data-settings-page="profile"><span class="icon-slot" data-icon="userRound"></span><span>Profile</span></button><button type="button" data-settings-page="keyboard-shortcuts"><span class="icon-slot" data-icon="command"></span><span>Keyboard shortcuts</span></button></section>
         <section class="settings-nav-group" data-settings-group="integrations"><h2>Integrations</h2><button type="button" data-settings-page="plugins-settings"><span class="icon-slot" data-icon="wrench"></span><span>Plugins</span></button><button type="button" data-settings-page="skills-settings"><span class="icon-slot" data-icon="file"></span><span>Skills</span></button><button type="button" data-settings-page="browser-use"><span class="icon-slot" data-icon="globe"></span><span>Browser</span></button></section>
         <section class="settings-nav-group" data-settings-group="coding"><h2>Coding</h2><button type="button" data-settings-page="connections"><span class="icon-slot" data-icon="monitor"></span><span>MCP servers</span></button><button type="button" data-settings-page="code-review"><span class="icon-slot" data-icon="fileDiff"></span><span>Code review</span></button></section>
         <section class="settings-nav-group" data-settings-group="archived"><h2>Archived</h2><button type="button" data-settings-page="data-controls"><span class="icon-slot" data-icon="list"></span><span>Archived chats</span></button></section>
