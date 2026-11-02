@@ -20,13 +20,13 @@
 > [!IMPORTANT]
 > This is an **unofficial community project**. It is not affiliated with, endorsed by, or maintained by OpenAI. OpenAI and Codex are trademarks of their respective owners.
 
-Codex WebUI connects directly to `codex app-server --stdio` and exposes the local Codex experience through a responsive browser interface. It keeps real threads, models, streaming responses, tool activity, approval requests, diffs, and token usage instead of simulating them in a static frontend.
+Codex WebUI connects to the existing local Codex daemon when available, otherwise starts `codex app-server --stdio`, and exposes the local Codex experience through a responsive browser interface. It keeps real threads, models, streaming responses, tool activity, approval requests, diffs, and token usage instead of simulating them in a static frontend.
 
 ![Codex WebUI desktop screenshot](./docs/assets/overview.png)
 
 ## Highlights
 
-- Real `codex app-server --stdio` bridge over WebSocket
+- Shared local Codex daemon connection or a standalone `codex app-server --stdio` bridge
 - Real model catalog, reasoning effort options, threads, and streaming turns
 - Command, file-change, network, and permission approval surfaces
 - Approval scopes such as **Allow once**, **Allow similar commands**, and session-level approval
@@ -98,6 +98,8 @@ Save a bound domain in the same settings page to enable remote access. Only dire
 
 `CODEX_WEBUI_ACCESS_TOKEN` remains available for compatibility with Basic/Bearer clients. `CODEX_WEBUI_PASSWORD` takes precedence over both the managed password and access token for browser login. Set `CODEX_WEBUI_AUTH_STORE` to move the managed credential file.
 
+Messages wait in a per-thread queue while another Codex app or CLI owns the thread, then send automatically in order. The composer shows pending messages with cancel and retry actions. The queue is stored next to the credential file as `codex-webui-auth.json.queue.json` and survives refreshes and restarts. Messages whose delivery was uncertain during a crash require checking the conversation before retrying.
+
 Paste images into the composer or use the plus button to select PNG, JPEG, WebP or GIF files. Image-only messages are supported. Limits: 10 MB per image, 10 images and 20 MB total per message. Configure reverse proxies to accept at least 30 MB request bodies (for Nginx: `client_max_body_size 30m;`).
 
 ## Configuration
@@ -129,8 +131,12 @@ bun run start
 | `CODEX_WEBUI_CWD` | repository directory | Initial Codex working directory |
 | `CODEX_WEBUI_REVIEW_ROOT` | `CODEX_WEBUI_CWD` | Exact Git root allowed for Undo/Reapply |
 | `CODEX_HOME` | `~/.codex` | Codex state directory containing `auth.json` |
+| `CODEX_WEBUI_APP_SERVER_MODE` | `auto` | Prefer the local shared daemon; `shared` requires it, `standalone` starts an isolated backend |
+| `CODEX_WEBUI_APP_SERVER_SOCKET` | `$CODEX_HOME/app-server-control/app-server-control.sock` | Optional local daemon Unix socket path |
 | `CODEX_AUTH_PATH` | `$CODEX_HOME/auth.json` | Optional explicit Codex authentication file path |
 | `PLAYWRIGHT_EXECUTABLE_PATH` | auto-detected | Optional Chrome/Edge path for browser tests |
+
+Shared connections let WebUI control the same running threads as local Codex. Exiting WebUI only disconnects its client; it never stops the shared daemon. Disconnections trigger reconnection. Standalone mode cannot control threads running in another backend.
 
 ## Security model
 
@@ -173,7 +179,7 @@ The shell mirrors Codex Desktop's separate Bottom Panel, Summary, and Task Side 
 ```mermaid
 flowchart LR
     Browser[Browser UI] <-->|WebSocket JSON-RPC| Server[Bun HTTP + WS server]
-    Server <-->|stdio JSON-RPC| Codex[codex app-server]
+    Server <-->|shared socket / stdio JSON-RPC| Codex[codex app-server]
     Browser <-->|Authenticated terminal WebSocket| PTY[Node PTY worker]
     PTY <-->|xterm-256color| Shell[Local login shell]
     Browser -->|Folder API| Server

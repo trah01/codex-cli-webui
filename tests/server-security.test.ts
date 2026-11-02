@@ -38,7 +38,7 @@ describe("WebUI server security boundary", () => {
     for (const method of ["model/list", "permissionProfile/list", "account/logout", "thread/list", "thread/read", "thread/delete", "thread/resume", "thread/turns/list", "host/thread/live", "thread/start", "turn/start", "turn/steer", "turn/interrupt"]) {
       expect(isAllowedBrowserRpcMethod(method)).toBe(true);
     }
-    for (const method of ["skills/list", "mcpServerStatus/list"]) {
+    for (const method of ["skills/list", "mcpServerStatus/list", "host/thread/send", "host/thread/queue/list", "host/thread/queue/cancel", "host/thread/queue/retry"]) {
       expect(isAllowedBrowserRpcMethod(method)).toBe(true);
     }
     for (const method of ["fs/readFile", "fs/writeFile", "fs/remove", "fs/copy", "config/read", "account/read", "skills/config/write", "mcpServer/oauth/login"]) {

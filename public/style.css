@@ -394,6 +394,17 @@ body.sidebar-hidden .sidebar{box-shadow:none!important}
 .composer-context-tray{display:flex;min-height:0;flex-wrap:wrap;align-items:center;gap:6px;padding:9px 11px 0}
 .composer-context-tray[hidden]{display:none}
 .composer-context-chip{height:28px;max-width:260px;display:inline-flex;align-items:center;gap:6px;padding:0 8px;border:1px solid var(--app-border-default);border-radius:8px;background:var(--app-fog);color:var(--app-text-secondary);font-size:12px}
+.composer-queue{display:flex;flex-direction:column;gap:6px;max-height:160px;overflow-y:auto;margin-bottom:8px}
+.composer-queue[hidden]{display:none}
+.composer-queue-row{display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--app-border-default);border-radius:8px;font-size:12px;line-height:1.5}
+.composer-queue-copy{flex:1;min-width:0;display:flex;flex-direction:column}
+.composer-queue-status{color:var(--app-text-tertiary)}
+.composer-queue-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.composer-queue-error{color:var(--app-text-secondary);overflow-wrap:anywhere}
+.composer-queue-row>button{flex:none;min-height:32px;padding:4px 8px;border-radius:5px;color:var(--app-text-secondary)}
+.composer-queue-row>button:hover{background:var(--app-hover);color:var(--app-text)}
+.composer-queue-row>button:focus-visible{outline:2px solid var(--app-link);outline-offset:2px}
+.composer-queue-row>button:disabled{opacity:.5;cursor:wait}
 .composer-image-chip{height:48px;padding:4px 8px 4px 4px}
 .composer-image-chip>img{width:38px;height:38px;object-fit:cover;border-radius:4px}
 .composer-image-chip>button{width:28px;height:28px}
@@ -603,11 +614,8 @@ body.sidebar-hidden .sidebar{box-shadow:none!important}
 body.sidebar-hidden .sidebar>div{opacity:0}
 .sidebar-top{position:relative;gap:8px;padding:8px 8px 0}
 .sidebar-mode-row{height:32px;margin-left:8px;padding-right:1px;display:flex;align-items:center;gap:4px}
-.sidebar-product{min-width:0;max-width:calc(100% - 36px);height:32px;display:flex;align-items:center;gap:4px;margin-left:-8px;padding:0 8px;border-radius:12px;color:var(--app-text);text-align:left}
-.sidebar-product:hover{background:var(--app-hover)}
+.sidebar-product{min-width:0;max-width:calc(100% - 36px);height:32px;display:flex;align-items:center;gap:4px;margin-left:-8px;padding:0 8px;border-radius:12px;color:var(--app-text);text-align:left;cursor:default}
 .sidebar-product strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:"OpenAI Sans",var(--ui);font-size:var(--ui-font-title);line-height:24px;font-weight:600;letter-spacing:0}
-.sidebar-product .chevron{width:12px;height:12px;min-width:12px}
-.sidebar-product .chevron svg{width:10px;height:10px}
 .sidebar-toolbar-button,.sidebar-help-button{width:32px;height:32px;min-width:32px;display:grid;place-items:center;border-radius:10px;color:var(--app-text-secondary)}
 .sidebar-toolbar-button{margin-left:auto}
 .sidebar-toolbar-button:hover,.sidebar-help-button:hover,.sidebar-help-button[aria-expanded=true]{background:var(--app-hover);color:var(--app-text)}
@@ -630,6 +638,12 @@ body.sidebar-hidden .sidebar>div{opacity:0}
 .thread-list{min-height:0;overflow:visible;padding:0;scrollbar-color:var(--app-border-default) transparent}
 .sidebar-project-group{display:flex;flex-direction:column;gap:1px}
 .sidebar-project-group+.sidebar-project-group{margin-top:1px}
+.sidebar-project-heading{position:relative;min-width:0}
+.sidebar-project-new{position:absolute;right:25px;top:0;width:30px;height:30px;display:grid;place-items:center;border-radius:7px;color:var(--app-text-secondary)}
+.sidebar-project-new:hover,.sidebar-project-new:active{background:var(--app-hover);color:var(--app-text)}
+.sidebar-project-new:focus-visible{outline:2px solid var(--app-link);outline-offset:-2px}
+.sidebar-project-new .icon-slot,.sidebar-project-new .icon-slot svg{width:16px;height:16px}
+.sidebar-project-heading .sidebar-project-row>span:nth-child(2){padding-right:30px}
 .sidebar-project-row{width:100%;height:30px;display:flex;align-items:center;gap:8px;padding:0 8px;border-radius:10px;color:var(--app-text);font-size:var(--ui-font-size);text-align:left}
 .sidebar-project-row:hover{background:var(--app-hover)}
 .sidebar-project-row>.icon-slot:first-child,.sidebar-project-row>.icon-slot:first-child svg{width:16px;height:16px;min-width:16px;color:var(--app-text-secondary)}

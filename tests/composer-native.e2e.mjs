@@ -115,16 +115,16 @@ if(errors.length
   ||!/Model/i.test(modelMain.modelRow||'')
   ||modelMain.directModelRows!==0
   ||modelMain.width<210||modelMain.width>250
-  ||!effortSelection.menuHidden||effortSelection.label!=='High'
+  ||!effortSelection.menuHidden||effortSelection.label!=='high'
   ||modelSubmenu.title!=='Model'
   ||modelSubmenu.rows.length<1
   ||!modelSubmenu.back
   ||modelMain.effortRows.includes('Light')
   ||lunaEfforts.includes('Light')
   ||solEfforts.includes('Light')
-  ||lunaEfforts.includes('Ultra')
-  ||!lunaEfforts.includes('Max')
-  ||!solEfforts.includes('Ultra')
+  ||lunaEfforts.includes('ultra')
+  ||!lunaEfforts.includes('max')
+  ||!solEfforts.includes('ultra')
   ||!mobileModel.label
   ||mobileModel.labelDisplay==='none'
   ||mobileModel.labelWidth<1

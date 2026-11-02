@@ -1,6 +1,5 @@
 import { createReadStream, existsSync, readFileSync } from "node:fs";
 import { join, relative, resolve, extname } from "node:path";
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { networkInterfaces, tmpdir } from "node:os";
 import { WebSocketServer, WebSocket } from "ws";
@@ -35,6 +34,8 @@ import { loadStoredPassword, passwordStorePath, saveStoredPassword, replaceStore
 import { boundDomainRequest, loadBoundDomain, normalizeBoundDomain, saveBoundDomain } from "./access-policy.js";
 import { validateImageInputs, TURN_REQUEST_MAX_BYTES } from "./public/composer-input.js";
 import { interruptThread } from "./turn-control.js";
+import { createMessageQueue } from "./message-queue.js";
+import { createCodexConnection } from "./codex-connection.js";
 import {
   createAccountIdentityLoader,
   fetchProfileAvatar,
@@ -79,79 +80,56 @@ const settingsService = createSettingsService(request);
 const threadPaths = new Map<string, string>();
 let codexSessionsRoot = resolve(homeDir, ".codex", "sessions");
 let seq = 1;
-let codex: ChildProcessWithoutNullStreams | null = null;
-let stdoutBuffer = "";
 let connected = false;
 let shuttingDown = false;
 let restartTimer: ReturnType<typeof setTimeout> | null = null;
+const messageQueue = createMessageQueue({
+  storePath: `${managedPasswordPath}.queue.json`, request,
+  canSend: () => connected && !shuttingDown, notify: broadcast,
+});
 let httpClosed = false;
 const accountLoader = createAccountIdentityLoader(async (refresh) => {
   const account = await request("account/read", { refreshToken: refresh });
   return resolveAccountIdentity(account);
 });
 
-function startCodex() {
-  if (shuttingDown) return;
-  if (codex && codex.exitCode === null) return;
-  const child = spawn("codex", ["app-server", "--stdio"], {
-    cwd: defaultCwd,
-    env: process.env,
-    stdio: ["pipe", "pipe", "pipe"],
-    detached: process.platform !== "win32",
-  });
-  codex = child;
-  connected = false;
-  stdoutBuffer = "";
-  child.stdout.setEncoding("utf8");
-  child.stdout.on("data", (chunk) => {
-    stdoutBuffer += chunk;
-    for (;;) {
-      const pos = stdoutBuffer.indexOf("\n");
-      if (pos < 0) break;
-      const line = stdoutBuffer.slice(0, pos).trim();
-      stdoutBuffer = stdoutBuffer.slice(pos + 1);
-      if (!line) continue;
-      try { handleCodex(JSON.parse(line)); }
-      catch (error) { console.error("[codex-webui] invalid app-server JSON:", line, error); }
-    }
-  });
-  child.stderr.setEncoding("utf8");
-  child.stderr.on("data", (data) => console.error("[codex app-server]", String(data).trimEnd()));
-  child.on("exit", (code, signal) => {
+const codexConnection = createCodexConnection({
+  cwd: defaultCwd, env: process.env, onMessage: handleCodex,
+  onError: (error: Error) => console.error("[codex app-server]", error.message),
+  onConnect: () => {
     connected = false;
-    accountLoader.invalidate();
-    reviewDiffs.clear();
+    initialize().catch(error => {
+      console.error("[codex-webui] initialize failed", error.message);
+      terminateCodex();
+    });
+  },
+  onDisconnect: ({ code, signal }: { code?: number | null; signal?: string | null }) => {
+    connected = false;
+    accountLoader.invalidate(); reviewDiffs.clear();
     broadcast({ type: "bridge/status", status: "disconnected", code, signal });
-    for (const item of pending.values()) item.reject(new Error("Codex app-server exited"));
+    for (const item of pending.values()) item.reject(new Error("Codex connection closed"));
     pending.clear();
-    if (codex === child) codex = null;
     if (shuttingDown) maybeFinishShutdown();
     else restartTimer = setTimeout(startCodex, 1000);
-  });
-  initialize().catch((error) => {
-    console.error("[codex-webui] initialize failed", error);
-    terminateCodex();
-  });
+  },
+});
+
+function startCodex() {
+  if (!shuttingDown) codexConnection.start();
 }
 
 function terminateCodex(signal: NodeJS.Signals = "SIGTERM") {
-  const child = codex;
-  if (!child || child.exitCode !== null) return;
-  if (process.platform !== "win32" && child.pid) {
-    try { process.kill(-child.pid, signal); return; }
-    catch { /* Fall back to terminating the wrapper process. */ }
-  }
-  child.kill(signal);
+  codexConnection.stop(signal);
 }
 
 function maybeFinishShutdown() {
-  if (shuttingDown && httpClosed && !codex) process.exit(0);
+  if (shuttingDown && httpClosed && !codexConnection.running) process.exit(0);
 }
 
 function sendRaw(message: any) {
   if (shuttingDown) throw new Error("Codex WebUI is shutting down");
   startCodex();
-  codex!.stdin.write(JSON.stringify(message) + "\n");
+  codexConnection.send(message);
 }
 
 function request(method: string, params: any = {}) {
@@ -177,6 +155,7 @@ async function initialize() {
   sendRaw({ method: "initialized", params: {} });
   if (typeof result?.codexHome === "string") codexSessionsRoot = resolve(result.codexHome, "sessions");
   connected = true;
+  messageQueue.wake();
   broadcast({ type: "bridge/status", status: "connected", info: result });
 }
 
@@ -201,7 +180,10 @@ function handleCodex(message: any) {
     if (message.method === "item/completed" && message.params?.item?.type === "fileChange") {
       recordFileChangeDiff({ ...message.params, changes: message.params.item.changes });
     }
-    if (message.method === "turn/completed") notifyNtfyTurnCompleted(message.params || {});
+    if (message.method === "turn/completed") {
+      notifyNtfyTurnCompleted(message.params || {});
+      messageQueue.wake();
+    }
     broadcast({ type: "codex/notification", payload: message });
   }
 }
@@ -277,6 +259,14 @@ async function dispatchBrowserMessage(message: any) {
       if (["turn/start", "turn/steer"].includes(message.method)) validateImageInputs(params.input || []);
       const result = ["host/settings/read", "host/settings/write", "host/skills/set-enabled", "host/mcp/set-enabled"].includes(message.method)
         ? await settingsService(message.method, params)
+        : message.method === "host/thread/send"
+        ? messageQueue.enqueue(params)
+        : message.method === "host/thread/queue/list"
+        ? { messages: messageQueue.list(params.threadId) }
+        : message.method === "host/thread/queue/cancel"
+        ? messageQueue.cancel(params)
+        : message.method === "host/thread/queue/retry"
+        ? messageQueue.retry(params)
         : message.method === "host/thread/live"
         ? await readLiveThread(params.threadId)
         : message.method === "turn/interrupt"
@@ -580,7 +570,7 @@ const server = createServer(async (req, res) => {
   }
   if (url.pathname === "/api/health") {
     res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
-    res.end(JSON.stringify({ ok: true, codex: connected, version: "0.2.0" }));
+    res.end(JSON.stringify({ ok: true, codex: connected, codexBackend: codexConnection.kind, version: "0.2.0" }));
     return;
   }
   if (url.pathname === "/api/config") {
@@ -879,6 +869,7 @@ if (!frontendBuild.success) throw new Error(`Frontend build failed: ${frontendBu
 startCodex();
 server.listen(port, host, () => {
   console.log(`Codex WebUI listening on http://${host}:${port}`);
+  console.log(`[codex-webui] Codex connection: ${codexConnection.kind}`);
   if (passwordSetupRequired()) console.warn(`[codex-webui] Configure public access credentials at http://127.0.0.1:${port}/settings/access-settings`);
   if (!localhostOnly) {
     const addresses = Object.values(networkInterfaces()).flat().filter((entry): entry is NonNullable<typeof entry> => !!entry && entry.family === "IPv4" && !entry.internal);
@@ -889,6 +880,7 @@ server.listen(port, host, () => {
 function shutdown() {
   if (shuttingDown) return;
   shuttingDown = true;
+  messageQueue.close();
   connected = false;
   if (restartTimer) clearTimeout(restartTimer);
   restartTimer = null;

@@ -32,7 +32,7 @@ try{
       if(url.pathname==='/api/rpc'){
         const payload=JSON.parse(options.body||'{}');
         window.__composerRpcCalls.push(payload);
-        if(window.__composerConflictMode&&payload.method==='thread/resume')return new Response(JSON.stringify({type:'rpc/error',id:payload.id,error:'thread external-thread already has an active writer',code:'thread_active_writer'}),{status:200,headers:{'content-type':'application/json'}});
+        if(payload.method==='host/thread/send')return new Response(JSON.stringify({type:'rpc/result',result:{accepted:true,messages:[{id:payload.params.messageId,threadId:payload.params.threadId,status:'waiting',text:payload.params.input[0]?.text,imageCount:0}]}}),{status:200,headers:{'content-type':'application/json'}});
         return new Response(JSON.stringify({type:'rpc/result',result:{turnId:payload.params?.expectedTurnId||payload.params?.turnId||'ok'}}),{status:200,headers:{'content-type':'application/json'}});
       }
       return window.__composerOriginalFetch(resource,options);
@@ -44,7 +44,7 @@ try{
   const steer=await page.evaluate(()=>({mode:document.querySelector('#sendButton')?.dataset.submitMode,title:document.querySelector('#sendButton')?.title,stopped:document.querySelector('#sendButton')?.classList.contains('stop'),arrow:Boolean(document.querySelector('#sendButton path[d="M12 19V5"]'))}));
   await page.click('#sendButton');
   await page.waitForTimeout(100);
-  const afterSteer=await page.evaluate(()=>({input:document.querySelector('#prompt')?.value,mode:document.querySelector('#sendButton')?.dataset.submitMode,call:window.__composerRpcCalls.find(call=>call.method==='turn/steer')}));
+  const afterSteer=await page.evaluate(()=>({input:document.querySelector('#prompt')?.value,mode:document.querySelector('#sendButton')?.dataset.submitMode,call:window.__composerRpcCalls.find(call=>call.method==='host/thread/send')}));
   await page.click('#sendButton');
   await page.waitForTimeout(100);
   const interrupt=await page.evaluate(()=>({mode:document.querySelector('#sendButton')?.dataset.submitMode,call:window.__composerRpcCalls.find(call=>call.method==='turn/interrupt')}));
@@ -52,11 +52,11 @@ try{
   await page.evaluate(()=>{const api=globalThis.__codexWebuiDebug;api.state.active={id:'external-thread',name:'External thread',cwd:api.state.config.defaultCwd,turns:[],canAcceptDirectInput:null};api.syncTurnSnapshot({id:'external-turn',status:'inProgress',itemsView:'full',items:[]});window.__composerConflictMode=true;window.__composerConflictCallStart=window.__composerRpcCalls.length});
   await page.locator('#prompt').fill('Keep this message when the CLI owns the task.');
   await page.click('#sendButton');
-  await page.waitForFunction(()=>document.querySelector('#toast')?.classList.contains('show'));
-  const conflict=await page.evaluate(()=>({input:document.querySelector('#prompt')?.value,toast:document.querySelector('#toast')?.textContent?.trim(),activeId:globalThis.__codexWebuiDebug.state.active?.id,calls:window.__composerRpcCalls.slice(window.__composerConflictCallStart).map(call=>call.method),mode:document.querySelector('#sendButton')?.dataset.submitMode}));
+  await page.waitForFunction(()=>document.querySelector('#composerQueue .composer-queue-row'));
+  const conflict=await page.evaluate(()=>({input:document.querySelector('#prompt')?.value,queued:document.querySelector('#composerQueue')?.textContent?.trim(),activeId:globalThis.__codexWebuiDebug.state.active?.id,calls:window.__composerRpcCalls.slice(window.__composerConflictCallStart).map(call=>call.method),mode:document.querySelector('#sendButton')?.dataset.submitMode}));
   const result={stop,steer,afterSteer,interrupt,send,conflict,errors};
   console.log(JSON.stringify(result,null,2));
-  if(errors.length||stop.mode!=='stop'||stop.title!=='Stop'||stop.turnId!=='composer-turn'||!stop.stopped||!stop.square||steer.mode!=='steer'||steer.title!=='Steer'||steer.stopped||!steer.arrow||afterSteer.input!==''||afterSteer.mode!=='stop'||afterSteer.call?.params?.threadId!=='composer-thread'||afterSteer.call?.params?.expectedTurnId!=='composer-turn'||afterSteer.call?.params?.input?.[0]?.text!=='Change direction while this task is running.'||interrupt.mode!=='stop'||interrupt.call?.params?.threadId!=='composer-thread'||interrupt.call?.params?.turnId!=='composer-turn'||send.mode!=='send'||send.title!=='Send message'||send.stopped||!send.arrow||conflict.input!=='Keep this message when the CLI owns the task.'||conflict.toast!=='This task is currently running in another Codex app or CLI. Close it there, then try again.'||conflict.activeId!=='external-thread'||JSON.stringify(conflict.calls)!==JSON.stringify(['thread/resume'])||conflict.mode!=='steer')process.exitCode=1;
+  if(errors.length||stop.mode!=='stop'||stop.title!=='Stop'||stop.turnId!=='composer-turn'||!stop.stopped||!stop.square||steer.mode!=='steer'||steer.title!=='Steer'||steer.stopped||!steer.arrow||afterSteer.input!==''||afterSteer.mode!=='stop'||afterSteer.call?.params?.threadId!=='composer-thread'||afterSteer.call?.params?.expectedTurnId!=='composer-turn'||afterSteer.call?.params?.input?.[0]?.text!=='Change direction while this task is running.'||interrupt.mode!=='stop'||interrupt.call?.params?.threadId!=='composer-thread'||interrupt.call?.params?.turnId!=='composer-turn'||send.mode!=='send'||send.title!=='Send message'||send.stopped||!send.arrow||conflict.input!==''||!conflict.queued?.includes('Keep this message when the CLI owns the task.')||!conflict.queued?.includes('Queued')||conflict.activeId!=='external-thread'||JSON.stringify(conflict.calls)!==JSON.stringify(['host/thread/send'])||conflict.mode!=='stop')process.exitCode=1;
 }finally{
   await browser?.close();
   server.kill();

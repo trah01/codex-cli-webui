@@ -68,7 +68,7 @@ console.log(JSON.stringify({chinese,english,persisted,errors},null,2));
 await browser.close();
 if(
   errors.length||
-  chinese.lang!=='zh-CN'||chinese.preference!=='zh-CN'||chinese.newChat!=='新对话'||chinese.threadTitle!=='新任务'||chinese.settings!=='设置'||chinese.page!=='通用'||chinese.language!=='zh-CN'||chinese.systemOption!=='跟随系统'||chinese.effort!=='低'||chinese.content!=='Settings Running command'||
-  english.lang!=='en'||english.preference!=='en'||english.newChat!=='New chat'||english.threadTitle!=='New task'||english.page!=='General'||english.language!=='en'||english.effort!=='Low'||english.content!=='Settings Running command'||
+  chinese.lang!=='zh-CN'||chinese.preference!=='zh-CN'||chinese.newChat!=='新对话'||chinese.threadTitle!=='新任务'||chinese.settings!=='设置'||chinese.page!=='通用'||chinese.language!=='zh-CN'||chinese.systemOption!=='跟随系统'||chinese.effort!=='low'||chinese.content!=='Settings Running command'||
+  english.lang!=='en'||english.preference!=='en'||english.newChat!=='New chat'||english.threadTitle!=='New task'||english.page!=='General'||english.language!=='en'||english.effort!=='low'||english.content!=='Settings Running command'||
   persisted.lang!=='zh-CN'||persisted.preference!=='zh-CN'||persisted.language!=='zh-CN'||persisted.page!=='通用'
 )process.exit(1);

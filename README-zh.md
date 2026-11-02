@@ -20,13 +20,13 @@
 > [!IMPORTANT]
 > 这是一个**非官方社区项目**，与 OpenAI 没有隶属、背书或维护关系。OpenAI、Codex 及相关标识归其各自权利人所有。
 
-Codex WebUI 直接连接 `codex app-server --stdio`，通过响应式浏览器界面提供本地 Codex 体验。模型列表、历史会话、流式回答、工具活动、审批请求、Diff 和 Token 使用量均来自真实 app-server，而不是前端静态模拟。
+Codex WebUI 优先连接本机已有的 Codex 共享后台，未发现共享后台时启动 `codex app-server --stdio`，通过响应式浏览器界面提供本地 Codex 体验。模型列表、历史会话、流式回答、工具活动、审批请求、Diff 和 Token 使用量均来自真实 app-server，而不是前端静态模拟。
 
 ![Codex WebUI 桌面截图](./docs/assets/overview.png)
 
 ## 主要功能
 
-- 通过 WebSocket 桥接真实 `codex app-server --stdio`
+- 通过 WebSocket 共享本机 Codex 后台，或桥接独立的 `codex app-server --stdio`
 - 真实模型目录、推理强度、历史 Thread 和流式 Turn
 - 命令、文件修改、网络和权限审批框
 - 支持 **Allow once**、**Allow similar commands** 和会话级授权
@@ -96,6 +96,8 @@ HOST=0.0.0.0 CODEX_WEBUI_PASSWORD='use-a-long-random-password' bun run start
 
 在同一设置页填写绑定域名（例如 `codex.example.com`）并保存。未绑定时仅允许直接通过 `127.0.0.1` 访问；绑定后只允许 `127.0.0.1` 和该域名，其他域名、局域网 IP、`localhost` 和 IPv6 地址均被拒绝。域名配置保存在凭据文件旁的 `codex-webui-auth.json.access.json`，修改域名无需重新设置密码。反向代理应保留外部 `Host`，或传递准确的 `X-Forwarded-Host`（域名及外部端口）；后端只接受与绑定域名匹配的转发地址。域名绑定不替代反向代理和 TLS 配置。远程客户端在登录前，无法访问应用 Bundle、HTTP API 和 WebSocket bridge。认证成功后使用签名的 `HttpOnly`、`SameSite=Strict` 会话 Cookie。
 
+会话被其他 Codex 应用或 CLI 占用时，发送的消息会排队等待，空闲后按顺序自动发送。输入框附近可查看、取消排队消息，发送失败后可重试。队列保存在凭据文件旁的 `codex-webui-auth.json.queue.json`，刷新页面或正常重启后仍会保留；若异常退出时无法确认发送结果，会提示先检查对话再重试。
+
 输入框支持直接粘贴图片，也可以点击加号选择 PNG、JPEG、WebP 或 GIF；可单独发送图片。每张最多 10 MB，每次最多 10 张、合计 20 MB。反向代理的请求体大小限制应至少设为 30 MB（Nginx 可使用 `client_max_body_size 30m;`）。
 
 ## 配置
@@ -127,8 +129,12 @@ bun run start
 | `CODEX_WEBUI_CWD` | 仓库目录 | Codex 初始工作目录 |
 | `CODEX_WEBUI_REVIEW_ROOT` | 与 `CODEX_WEBUI_CWD` 相同 | 允许 Undo/Reapply 的精确 Git 根目录 |
 | `CODEX_HOME` | `~/.codex` | 包含 `auth.json` 的 Codex 状态目录 |
+| `CODEX_WEBUI_APP_SERVER_MODE` | `auto` | 优先共享本机后台；`shared` 强制共享，`standalone` 使用独立后台 |
+| `CODEX_WEBUI_APP_SERVER_SOCKET` | `$CODEX_HOME/app-server-control/app-server-control.sock` | 可选的本机共享后台 Unix socket 路径 |
 | `CODEX_AUTH_PATH` | `$CODEX_HOME/auth.json` | 可选的 Codex 认证文件精确路径 |
 | `PLAYWRIGHT_EXECUTABLE_PATH` | 自动检测 | 浏览器测试可选的 Chrome/Edge 路径 |
+
+共享连接让 WebUI 与本机 Codex 操作同一运行中的会话。退出 WebUI 只断开连接，不会停止共享后台；共享后台断线时会自动重连。独立模式无法接管其他后台正在运行的会话。
 
 ## 安全模型
 
@@ -171,7 +177,7 @@ Undo/Reapply 被严格限制在配置的仓库根目录中。
 ```mermaid
 flowchart LR
     Browser[浏览器 UI] <-->|WebSocket JSON-RPC| Server[Bun HTTP + WS 服务]
-    Server <-->|stdio JSON-RPC| Codex[codex app-server]
+    Server <-->|shared socket / stdio JSON-RPC| Codex[codex app-server]
     Browser <-->|受认证保护的终端 WebSocket| PTY[Node PTY worker]
     PTY <-->|xterm-256color| Shell[本地登录 Shell]
     Browser -->|目录 API| Server
