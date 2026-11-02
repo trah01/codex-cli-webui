@@ -43,6 +43,7 @@ describe("Desktop-style live session reader", () => {
     expect(state.turn.items.find((item: any) => item.type === "agentMessage")).toMatchObject({ text: "Running now.", phase: "commentary" });
     expect(state.turn.items.find((item: any) => item.type === "commandExecution")).toMatchObject({ command: "for i in 1 2; do echo $i; done", status: "inProgress", aggregatedOutput: "1\n" });
     expect(state.turn.items.filter((item: any) => item.type === "userMessage")).toEqual([
+      expect.objectContaining({ content: [{ type: "text", text: "Start the task." }] }),
       expect.objectContaining({ content: [{ type: "text", text: "Also check the stylesheet." }] }),
     ]);
     expect(state.turn.items.find((item: any) => item.type === "fileChange")).toMatchObject({
@@ -82,7 +83,9 @@ describe("Desktop-style live session reader", () => {
         line("event_msg", { type: "task_started", turn_id: "turn-3", started_at: 30 })
         + line("event_msg", { type: "user_message", message: "Initial prompt" }),
       );
-      expect(store.read(path).turn.items).toHaveLength(0);
+      expect(store.read(path).turn.items).toEqual([
+        expect.objectContaining({ id: "host-user-turn-3-1", content: [{ type: "text", text: "Initial prompt" }] }),
+      ]);
 
       appendFileSync(path,
         line("event_msg", { type: "user_message", message: "Steer the active task" }, "2026-08-11T06:26:26.000Z")
@@ -95,18 +98,18 @@ describe("Desktop-style live session reader", () => {
         }, "2026-08-11T06:26:27.000Z"),
       );
       const updated = store.read(path).turn;
-      expect(updated.items).toHaveLength(2);
-      expect(updated.items[0]).toMatchObject({
+      expect(updated.items).toHaveLength(3);
+      expect(updated.items[1]).toMatchObject({
         id: "host-user-turn-3-2",
         type: "userMessage",
         content: [{ type: "text", text: "Steer the active task" }],
       });
-      expect(updated.items[1]).toMatchObject({
+      expect(updated.items[2]).toMatchObject({
         id: "host-patch-turn-3-1",
         type: "fileChange",
         changes: [{ path: "/tmp/live.ts", diff: "@@ -1 +1 @@\n-a\n+b\n" }],
       });
-      expect(store.read(path).turn.items).toHaveLength(2);
+      expect(store.read(path).turn.items).toHaveLength(3);
     } finally { rmSync(directory, { recursive: true, force: true }); }
   });
 });

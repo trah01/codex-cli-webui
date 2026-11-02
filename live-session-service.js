@@ -118,7 +118,7 @@ export function applyRolloutEvent(state, event) {
       status: "inProgress",
       itemsView: "full",
       items: [],
-      ...(Number.isFinite(payload.started_at) ? { startedAt: payload.started_at } : {}),
+      ...(Number.isFinite(payload.started_at) ? { startedAt: payload.started_at } : Number.isFinite(Date.parse(event.timestamp)) ? { startedAtMs: Date.parse(event.timestamp) } : {}),
     };
     return state;
   }
@@ -127,6 +127,7 @@ export function applyRolloutEvent(state, event) {
     state.active = false;
     state.turn.status = payload.type === "turn_aborted" ? "interrupted" : "completed";
     if (Number.isFinite(payload.completed_at)) state.turn.completedAt = payload.completed_at;
+    else if (Number.isFinite(Date.parse(event.timestamp))) state.turn.completedAtMs = Date.parse(event.timestamp);
     for (const item of state.turn.items) if (item.status === "inProgress") item.status = state.turn.status;
     state.activeCommandId = null;
     return state;
@@ -134,12 +135,16 @@ export function applyRolloutEvent(state, event) {
   if (event.type === "event_msg" && payload.type === "user_message") {
     state.userSequence += 1;
     const text = String(payload.message || "").trim();
-    // thread/read already owns the opening prompt; rollout is needed for later CLI steering messages.
-    if (state.userSequence > 1 && text) {
+    const content = [
+      ...(text ? [{ type: "text", text }] : []),
+      ...(payload.images || []).map(url => ({ type: "image", url })),
+      ...(payload.local_images || []).map(path => ({ type: "localImage", path })),
+    ];
+    if (content.length) {
       upsertItem(state, {
         id: `host-user-${state.turn.id}-${state.userSequence}`,
         type: "userMessage",
-        content: [{ type: "text", text }],
+        content,
         status: "completed",
       });
     }

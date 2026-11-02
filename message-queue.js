@@ -45,6 +45,11 @@ export function createMessageQueue({ storePath, request, notify = () => {}, canS
     };
   }
   function list(threadId) { return messages.filter(message => message.params.threadId === threadId).map(summary); }
+  function submitted(messageId, params) {
+    return { messageId, threadId: params.threadId, item: {
+      id: `host-sent-${messageId}`, type: 'userMessage', content: structuredClone(params.input),
+    } };
+  }
   function changed(threadId) { notify({ type: 'bridge/queue', threadId, messages: list(threadId) }); }
   function schedule(threadId, delay = 0) {
     if (closed || timers.has(threadId)) return;
@@ -98,9 +103,14 @@ export function createMessageQueue({ storePath, request, notify = () => {}, canS
       }
       if (result === null) { message.status = 'waiting'; save(); changed(threadId); return; }
       // Persist receipts so retrying an acknowledged request cannot send it twice.
+      const turnId = result?.turn?.id || result?.turnId || message.params.expectedTurnId;
+      const delivered = turnId ? {
+        type: 'bridge/message', threadId, turnId,
+        item: { id: `host-sent-${message.id}`, type: 'userMessage', content: message.params.input, status: 'completed' },
+      } : null;
       messages = messages.filter(entry => entry.id !== message.id);
-      receipts.push({ id: message.id, threadId }); receipts = receipts.slice(-1000);
-      save(); changed(threadId); delay = 0;
+      receipts.push({ id: message.id, threadId, delivered }); receipts = receipts.slice(-1000);
+      save(); if (delivered) notify(delivered); changed(threadId); delay = 0;
     } finally {
       running.delete(threadId);
       if (messages.some(entry => entry.params.threadId === threadId && entry.status === 'waiting')) schedule(threadId, delay);
@@ -114,12 +124,12 @@ export function createMessageQueue({ storePath, request, notify = () => {}, canS
     const existing = messages.find(message => message.id === messageId);
     const receipt = receipts.find(entry => entry.id === messageId);
     if ((existing && existing.params.threadId !== params.threadId) || (receipt && receipt.threadId !== params.threadId)) throw new Error('Message id belongs to another task');
-    if (existing || receipt) return { accepted: true, alreadySent: Boolean(receipt), messages: list(params.threadId) };
+    if (existing || receipt) return { accepted: true, alreadySent: Boolean(receipt), submitted: submitted(messageId, existing?.params || params), ...(receipt?.delivered ? { delivered: receipt.delivered } : {}), messages: list(params.threadId) };
     const message = { id: messageId, params: structuredClone(params), status: 'waiting', createdAt: Date.now() };
     messages.push(message);
     try { save(); } catch (error) { messages = messages.filter(entry => entry !== message); throw error; }
     changed(params.threadId); schedule(params.threadId);
-    return { accepted: true, messages: list(params.threadId) };
+    return { accepted: true, submitted: submitted(messageId, message.params), messages: list(params.threadId) };
   }
   function changeMessage({ threadId, messageId }, retry) {
     const message = messages.find(entry => entry.id === messageId && entry.params.threadId === threadId);

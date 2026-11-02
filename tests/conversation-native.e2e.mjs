@@ -95,7 +95,7 @@ const result=await page.evaluate(()=>{
     workedForFlexDirection:divider&&getComputedStyle(divider).flexDirection,
     workedForLineCount:divider?.querySelectorAll(':scope > div').length,
     workedForChildren:divider?[...divider.children].map(node=>node.tagName.toLowerCase()):[],
-    dividerBeforeFinal:!!divider&&!!final&&Boolean(divider.compareDocumentPosition(final)&Node.DOCUMENT_POSITION_FOLLOWING),
+    dividerAfterFinal:!!divider&&!!final&&Boolean(final.compareDocumentPosition(divider)&Node.DOCUMENT_POSITION_FOLLOWING),
     citation:(()=>{const link=message?.querySelector('.file-citation');return link?{text:link.textContent,href:link.getAttribute('href'),path:link.dataset.fileReference,lineStart:link.dataset.fileLineStart,lineEnd:link.dataset.fileLineEnd,title:link.title}:null})(),
     externalLink:(()=>{const link=[...message?.querySelectorAll('a')||[]].find(link=>link.href==='https://example.com/guide');return link?{target:link.target,rel:link.rel}:null})(),
     protocol:(()=>{const turn=document.querySelector('[data-turn-id="protocol-turn"]'),finals=[...turn.querySelectorAll('[data-local-conversation-final-assistant]')],link=turn.querySelector('[data-file-download]'),text=finals[0]?.textContent?.trim()||'';return{finalCount:finals.length,text,memoryVisible:/MEMORY\.md|oai-mem-citation|codex-file-citation/.test(text),link:link?{text:link.textContent,path:link.dataset.fileDownload,download:link.getAttribute('download'),href:link.getAttribute('href')}:null}})(),
@@ -161,7 +161,7 @@ if(result.citation?.text!=='app.js'||result.citation.href!=='#file-reference'||r
 if(result.externalLink?.target!=='_blank'||!result.externalLink.rel.includes('noopener')||!result.externalLink.rel.includes('noreferrer'))throw new Error(`External links must retain safe target metadata: ${JSON.stringify(result.externalLink)}`);
 if(result.protocol.finalCount!==1||result.protocol.text.replace(/\s+/g,' ')!=='Artifact ready. 旅行 计划.xlsx'||result.protocol.memoryVisible||result.protocol.link?.text!=='旅行 计划.xlsx'||result.protocol.link?.path!=='/tmp/旅行 计划.xlsx'||result.protocol.link?.download!=='旅行 计划.xlsx'||!result.protocol.link?.href.startsWith('/api/files/download?'))throw new Error(`Codex artifact citations and rollout aliases must render once without internal metadata: ${JSON.stringify(result.protocol)}`);
 if(result.citationClick?.hash!==''||JSON.stringify(result.citationClick.detail)!==JSON.stringify({path:'/tmp/example.ts',lineStart:12,lineEnd:14}))throw new Error(`File citation must preserve the conversation route and dispatch its reference: ${JSON.stringify(result.citationClick)}`);
-if(result.workedForText!=='Worked for 4s'||!result.dividerBeforeFinal)throw new Error(`Unexpected worked-for divider: ${result.workedForText}`);
+if(!/^Worked for 4s • \d{2}:\d{2}$/.test(result.workedForText)||!result.dividerAfterFinal)throw new Error(`Unexpected worked-for footer: ${result.workedForText}`);
 if(result.workedForFlexDirection!=='column'||result.workedForLineCount!==1||JSON.stringify(result.workedForChildren)!==JSON.stringify(['span','div']))throw new Error(`Worked-for unit must render label then one rule; got ${result.workedForFlexDirection}/${result.workedForLineCount}/${JSON.stringify(result.workedForChildren)}`);
 const type=result.markdownTypography;
 if(type.paragraph.marginTop!=='0px'||type.paragraph.marginBottom!=='11px')throw new Error(`Unexpected paragraph rhythm: ${JSON.stringify(type.paragraph)}`);

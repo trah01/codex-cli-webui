@@ -4,6 +4,21 @@ export const LOCALE_PREFERENCES = Object.freeze(["system", "zh-CN", "en"]);
 const ZH_CN = Object.create(null);
 
 Object.assign(ZH_CN, {
+  "Choose an answer": "请选择",
+  "Other answer": "其他答案",
+  "Enter your answer": "填写你的答案",
+  "Submit answers": "提交选择",
+  "Unable to send answer. Try again.": "答案未发送，请重试。",
+  "Global instructions": "全局提示词",
+  "Saved. The fallback global instructions are now active for new chats.": "已保存，新对话将使用备用的全局提示词。",
+  "Global instructions must be a regular file": "提示词文件必须是普通文件，不能是符号链接",
+  "Global instructions exceed the 1 MB limit": "全局提示词不能超过 1 MB",
+  "Global instructions changed. Reopen this page before saving.": "提示词已被其他操作修改，请重新打开此页后再编辑保存。",
+  "Chat": "对话",
+  "Preview": "预览",
+  "More": "更多",
+  "Chat views": "对话视图",
+  "No usage data yet": "暂无用量数据",
   "Light": "浅色",
   "Dark": "深色",
   "Public access": "公网准入",
