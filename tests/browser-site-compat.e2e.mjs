@@ -32,4 +32,4 @@ const result=await page.evaluate(()=>({sandbox:document.querySelector('#browserF
 console.log(JSON.stringify({styled,result,errors},null,2));
 await browser.close();
 await new Promise(resolve=>site.close(resolve));
-if(errors.length||styled!=='rgb(12, 34, 56)'||!result.sandbox.includes('allow-same-origin')||result.status!=='loaded')process.exit(1);
+if(errors.length||styled!=='rgb(12, 34, 56)'||!result.sandbox.includes('allow-same-origin')||result.status!=='ready')process.exit(1);

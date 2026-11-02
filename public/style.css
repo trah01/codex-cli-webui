@@ -314,7 +314,9 @@ body{background:var(--app-main);color:var(--app-text)}
 .browser-go{width:23px;height:23px;display:grid;place-items:center;border-radius:5px;color:var(--app-text-secondary)}
 .browser-go:hover{background:var(--app-hover);color:var(--app-text)}
 .browser-go .icon-slot,.browser-go svg{width:14px;height:14px}
-.browser-external{flex:0 0 auto}
+.browser-external{flex:0 0 auto;display:inline-flex;align-items:center;min-height:32px;padding:0 6px;border-radius:5px;color:var(--app-text);font-size:11px;text-decoration:none;white-space:nowrap}
+.browser-external:hover{background:var(--app-hover)}
+.browser-external:focus-visible{outline:2px solid var(--app-text-secondary);outline-offset:2px}
 .browser-external[hidden]{display:none}
 .browser-status{height:25px;flex:0 0 25px;display:flex;align-items:center;gap:6px;padding:0 10px;border-bottom:1px solid var(--app-border);color:var(--app-text-tertiary);font-size:10px;overflow:hidden}
 .browser-status span:last-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -337,6 +339,8 @@ body{background:var(--app-main);color:var(--app-text)}
 @keyframes browser-spin{to{transform:rotate(360deg)}}
 .browser-notice{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:start;gap:8px;padding:9px 10px;border-top:1px solid var(--app-border);background:var(--app-fog);color:var(--app-text-secondary)}
 .browser-notice[hidden]{display:none}
+.browser-notice[data-tone="ready"]{grid-template-columns:minmax(0,1fr) auto}
+.browser-notice[data-tone="ready"]>.icon-slot{display:none}
 .browser-notice>.icon-slot{width:16px;height:16px;color:var(--warning)}
 .browser-notice strong{display:block;color:var(--app-text);font-size:11px;font-weight:500}
 .browser-notice p{margin-top:2px;font-size:10px;line-height:1.4}

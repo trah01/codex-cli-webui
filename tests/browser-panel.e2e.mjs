@@ -24,16 +24,16 @@ for(const viewport of [{width:1280,height:720},{width:360,height:700}]){
   const second=`${base}/api/config?browser=second`;
   await page.fill('#browserUrl',first);
   await page.press('#browserUrl','Enter');
-  await page.waitForFunction(()=>document.querySelector('#browserStatus')?.dataset.tone==='loaded');
+  await page.waitForFunction(()=>document.querySelector('#browserStatus')?.dataset.tone==='ready');
   await page.fill('#browserUrl',second);
   await page.press('#browserUrl','Enter');
-  await page.waitForFunction(url=>document.querySelector('#browserUrl').value===url&&document.querySelector('#browserStatus')?.dataset.tone==='loaded',second);
+  await page.waitForFunction(url=>document.querySelector('#browserUrl').value===url&&document.querySelector('#browserStatus')?.dataset.tone==='ready',second);
   await page.click('#browserBack');
-  await page.waitForFunction(url=>document.querySelector('#browserUrl').value===url&&document.querySelector('#browserStatus')?.dataset.tone==='loaded',first);
+  await page.waitForFunction(url=>document.querySelector('#browserUrl').value===url&&document.querySelector('#browserStatus')?.dataset.tone==='ready',first);
   await page.click('#browserForward');
-  await page.waitForFunction(url=>document.querySelector('#browserUrl').value===url&&document.querySelector('#browserStatus')?.dataset.tone==='loaded',second);
+  await page.waitForFunction(url=>document.querySelector('#browserUrl').value===url&&document.querySelector('#browserStatus')?.dataset.tone==='ready',second);
   await page.click('#browserRefresh');
-  await page.waitForFunction(()=>document.querySelector('#browserStatus')?.dataset.tone==='loaded');
+  await page.waitForFunction(()=>document.querySelector('#browserStatus')?.dataset.tone==='ready');
   await page.click('#newTab');
   await page.click('#utilityTab');
 

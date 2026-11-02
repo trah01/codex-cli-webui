@@ -180,7 +180,7 @@
           <input id="browserUrl" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="Enter URL" aria-describedby="browserStatusText">
           <button class="browser-go" type="submit" title="Go to URL" aria-label="Go to URL"><span class="icon-slot" data-icon="arrowUp"></span></button>
         </form>
-        <a class="icon-button small browser-external" id="browserOpenExternal" title="Open in new tab" aria-label="Open in new tab" target="_blank" rel="noopener noreferrer" hidden><span class="icon-slot" data-icon="monitor"></span></a>
+        <a class="browser-external" id="browserOpenExternal" title="Open in new tab" target="_blank" rel="noopener noreferrer" hidden>Open in new tab</a>
       </div>
       <div class="browser-status" id="browserStatus" role="status" aria-live="polite">
         <span class="browser-status-dot" aria-hidden="true"></span><span id="browserStatusText">Ready</span>
@@ -193,7 +193,7 @@
       <div class="browser-notice" id="browserNotice" role="alert" hidden>
         <span class="icon-slot" data-icon="triangleAlert"></span>
         <div><strong id="browserNoticeTitle">Page could not be embedded</strong><p id="browserNoticeDescription"></p></div>
-        <a id="browserNoticeExternal" target="_blank" rel="noopener noreferrer" hidden>Open externally</a>
+        <a id="browserNoticeExternal" target="_blank" rel="noopener noreferrer" hidden>Open in new tab</a>
       </div>
     </section>
     <section class="side-panel-terminal" id="sideTerminalPanel" role="tabpanel" hidden aria-label="Terminal">
