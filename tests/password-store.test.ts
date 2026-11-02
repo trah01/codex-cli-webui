@@ -3,9 +3,21 @@ import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createStoredPassword } from "../server-security.js";
-import { loadStoredPassword, passwordStorePath, saveStoredPassword } from "../password-store.js";
+import { loadStoredPassword, passwordStorePath, saveStoredPassword, replaceStoredPassword } from "../password-store.js";
 
 describe("managed LAN password store", () => {
+  test("atomically replaces credentials without storing plaintext", () => {
+    const root = mkdtempSync(join(tmpdir(), "codex-webui-password-rotate-"));
+    const path = join(root, "auth.json");
+    try {
+      saveStoredPassword(path, createStoredPassword("previous test password"));
+      const credential = { ...createStoredPassword("replacement test password"), username: "new-admin" };
+      replaceStoredPassword(path, credential);
+      expect(loadStoredPassword(path)).toEqual(credential);
+      expect(statSync(path).mode & 0o777).toBe(0o600);
+      expect(readFileSync(path, "utf8")).not.toContain("replacement test password");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
   test("resolves the configured location", () => {
     expect(passwordStorePath({ CODEX_WEBUI_AUTH_STORE: "./custom-auth.json" })).toBe(join(process.cwd(), "custom-auth.json"));
     expect(passwordStorePath({ CODEX_HOME: "/tmp/codex-home" })).toBe("/tmp/codex-home/codex-webui-auth.json");

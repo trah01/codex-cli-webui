@@ -2,14 +2,46 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { createPasswordSession, createStoredPassword, isAllowedBrowserRpcMethod, isRequestAuthorized, parseCookieHeader, resolvePublicAsset, storedPasswordSessionSecret, verifyPasswordSession, verifyStoredPassword } from "../server-security.js";
+import { createPasswordSession, createStoredPassword, isAllowedBrowserRpcMethod, isRequestAuthorized, isAuthorizedHttpRequest, isLocalAuthManagementRequest, parseCookieHeader, resolvePublicAsset, storedPasswordSessionSecret, verifyPasswordSession, verifyStoredPassword } from "../server-security.js";
 
 describe("WebUI server security boundary", () => {
+  test("only direct IPv4 loopback requests can manage credentials", () => {
+    const local = { socket: { remoteAddress: "127.0.0.1" }, headers: { host: "127.0.0.1:8899", origin: "http://127.0.0.1:8899" } };
+    expect(isLocalAuthManagementRequest(local)).toBe(true);
+    expect(isLocalAuthManagementRequest({ ...local, socket: { remoteAddress: "::ffff:127.0.0.1" } })).toBe(true);
+    for (const address of ["::1", "192.168.1.2", "203.0.113.2"]) {
+      expect(isLocalAuthManagementRequest({ ...local, socket: { remoteAddress: address } })).toBe(false);
+    }
+    for (const host of ["localhost:8899", "[::1]:8899", "example.com", "192.168.1.2:8899", "127.1:8899", "127.0.0.1.example.com"]) {
+      expect(isLocalAuthManagementRequest({ ...local, headers: { host } })).toBe(false);
+    }
+    for (const name of ["forwarded", "x-forwarded-for", "x-forwarded-host", "x-forwarded-proto", "x-real-ip"]) {
+      expect(isLocalAuthManagementRequest({ ...local, headers: { ...local.headers, [name]: "" } })).toBe(false);
+    }
+    expect(isLocalAuthManagementRequest({ ...local, headers: { ...local.headers, origin: "https://example.com" } })).toBe(false);
+    expect(isLocalAuthManagementRequest({ ...local, headers: { ...local.headers, "sec-fetch-site": "cross-site" } })).toBe(false);
+  });
+
+  test("custom usernames authenticate and password rotation invalidates old sessions", () => {
+    const credential = { ...createStoredPassword("example long test password"), username: "test-admin" };
+    const secret = storedPasswordSessionSecret(credential);
+    const request = (username, password) => ({ socket: { remoteAddress: "192.168.1.2" }, headers: { host: "example.com", authorization: `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}` } });
+    expect(isAuthorizedHttpRequest(request("test-admin", "example long test password"), secret, true, credential)).toBe(true);
+    expect(isAuthorizedHttpRequest(request("codex", "example long test password"), secret, true, credential)).toBe(false);
+    expect(isAuthorizedHttpRequest(request("test-admin", "wrong password"), secret, true, credential)).toBe(false);
+    const session = createPasswordSession(secret);
+    const rotated = storedPasswordSessionSecret({ ...createStoredPassword("another long test password"), username: "test-admin" });
+    expect(verifyPasswordSession(session.token, rotated)).toBe(false);
+  });
+
   test("allows only the RPC methods used by the browser client", () => {
     for (const method of ["model/list", "permissionProfile/list", "account/logout", "thread/list", "thread/read", "thread/delete", "thread/resume", "thread/turns/list", "host/thread/live", "thread/start", "turn/start", "turn/steer", "turn/interrupt"]) {
       expect(isAllowedBrowserRpcMethod(method)).toBe(true);
     }
-    for (const method of ["fs/readFile", "fs/writeFile", "fs/remove", "fs/copy", "config/read", "account/read", "skills/list"]) {
+    for (const method of ["skills/list", "mcpServerStatus/list"]) {
+      expect(isAllowedBrowserRpcMethod(method)).toBe(true);
+    }
+    for (const method of ["fs/readFile", "fs/writeFile", "fs/remove", "fs/copy", "config/read", "account/read", "skills/config/write", "mcpServer/oauth/login"]) {
       expect(isAllowedBrowserRpcMethod(method)).toBe(false);
     }
   });

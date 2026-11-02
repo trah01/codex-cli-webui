@@ -25,6 +25,7 @@ async function start(){
   if(status.authenticated||(!status.setupRequired&&!status.passwordRequired)){await loadApp();return}
   const gate=$('#passwordGate'),app=$('#app'),input=$('#passwordInput'),confirmInput=$('#passwordConfirmInput'),form=$('#passwordLoginForm'),button=$('#passwordLoginButton'),error=$('#passwordError'),title=$('#passwordTitle');
   let mode=status.setupRequired?'setup':'login';
+  const username=$('#loginUsername');username.hidden=!status.usernameRequired;username.required=Boolean(status.usernameRequired);
   $('#passwordCodexMark').innerHTML=codexInterfaceMark('password-codex-mark');
   const configure=()=>{
     const setup=mode==='setup';
@@ -38,6 +39,12 @@ async function start(){
     button.textContent=t(setup?'Set password':'Log in');
   };
   configure();gate.hidden=false;app.setAttribute('aria-hidden','true');app.inert=true;requestAnimationFrame(()=>input.focus());
+  if(status.setupRequired&&!status.canManageCredentials){
+    title.textContent=t('Public access is not configured');
+    input.hidden=true;confirmInput.hidden=true;username.hidden=true;button.hidden=true;
+    error.textContent=t('Open http://127.0.0.1 on the server to set the access username and password.');error.hidden=false;
+    return;
+  }
   form.onsubmit=async event=>{
     event.preventDefault();error.hidden=true;
     if(mode==='setup'&&input.value.length<12){error.textContent=t('Password must be at least 12 characters');error.hidden=false;input.focus();return}
@@ -45,13 +52,13 @@ async function start(){
     const endpoint=mode==='setup'?'/api/auth/setup':'/api/auth/login';
     button.disabled=true;button.textContent=t(mode==='setup'?'Setting password…':'Logging in…');
     try{
-      const response=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({password:input.value})});
+      const response=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username:username.value,password:input.value})});
       const data=await response.json().catch(()=>({}));
       if(!response.ok){
         if(mode==='setup'&&response.status===409){mode='login';input.value='';configure();throw new Error(t('A password was already set. Log in to continue.'));}
-        throw new Error(data.error||t(mode==='setup'?'Unable to set the password':'Unable to log in'));
+        throw new Error(t(data.error||(mode==='setup'?'Unable to set the password':'Unable to log in')));
       }
-      gate.hidden=true;app.removeAttribute('aria-hidden');app.inert=false;input.value='';confirmInput.value='';
+      gate.hidden=true;app.removeAttribute('aria-hidden');app.inert=false;input.value='';confirmInput.value='';username.value='';
       await loadApp();
     }catch(reason){error.textContent=reason instanceof Error?reason.message:String(reason);error.hidden=false;input.select()}
     finally{button.disabled=false;button.textContent=t(mode==='setup'?'Set password':'Log in')}
