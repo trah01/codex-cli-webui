@@ -15,6 +15,8 @@
   <form class="password-login" id="passwordLoginForm">
     <span id="passwordCodexMark"></span>
     <h1 id="passwordTitle">Log in</h1>
+    <label class="sr-only" for="loginUsername">Username</label>
+    <input id="loginUsername" type="text" placeholder="Username" autocomplete="username" maxlength="64" hidden>
     <label class="sr-only" for="passwordInput">Password</label>
     <input id="passwordInput" type="password" placeholder="Password" autocomplete="current-password" required>
     <label class="sr-only" for="passwordConfirmInput">Confirm password</label>
@@ -38,7 +40,7 @@
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-top">
       <div class="sidebar-mode-row">
-        <button class="sidebar-product" id="productModeButton" type="button" aria-label="Switch mode, current mode: Codex"><strong>Codex</strong><span class="icon-slot chevron" data-icon="chevronDown"></span></button>
+        <div class="sidebar-product"><strong>Codex</strong></div>
         <button class="sidebar-toolbar-button" id="sidebarSearchButton" type="button" title="Search" aria-label="Search chats" aria-expanded="false" aria-controls="sidebarSearchPanel"><span class="icon-slot" data-icon="search"></span></button>
       </div>
       <div class="sidebar-search-panel" id="sidebarSearchPanel" hidden>
@@ -57,7 +59,6 @@
         <div class="account-menu-identity"><span class="account-menu-avatar account-initials" id="accountMenuAvatar">?</span><span><strong id="accountMenuName">Settings</strong><small id="accountMenuSubtitle"></small></span></div>
         <div class="account-menu-separator"></div>
         <button type="button" class="account-menu-row" id="accountProfile"><span class="icon-slot" data-icon="userRound"></span><span>Profile</span></button>
-        <button type="button" class="account-menu-row" id="accountUsage"><span class="icon-slot" data-icon="info"></span><span>Usage</span></button>
         <button type="button" class="account-menu-row" id="accountSettings"><span class="icon-slot" data-icon="wrench"></span><span>Settings</span></button>
         <button type="button" class="account-menu-row" id="accountShortcuts"><span class="icon-slot" data-icon="command"></span><span>Keyboard shortcuts</span></button>
         <div class="account-menu-separator"></div>
@@ -91,10 +92,11 @@
       <form class="composer" id="composer">
         <div class="composer-autocomplete" id="composerAutocomplete" role="listbox" aria-label="Composer suggestions" hidden></div>
         <div class="composer-context-tray" id="composerContextTray" aria-label="Attached context" hidden></div>
+        <input type="file" id="composerImageInput" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
         <textarea id="prompt" rows="1" placeholder="Do anything" aria-label="Task prompt"></textarea>
         <div class="composer-footer">
           <div class="composer-left">
-            <button type="button" class="composer-circle-button add-control" data-composer-control="add" title="Attach files and folders" aria-label="Attach files and folders"><span class="icon-slot" data-icon="plus"></span></button>
+            <button type="button" class="composer-circle-button add-control" data-composer-control="add" title="Attach images" aria-label="Attach images"><span class="icon-slot" data-icon="plus"></span></button>
             <button type="button" class="composer-text-button composer-project-control" id="composerProjectButton" data-composer-control="project" aria-label="Project"><span class="icon-slot" data-icon="folderOpen"></span><span id="composerProjectLabel">codex-webui</span><span class="icon-slot chevron" data-icon="chevronDown"></span></button>
             <div class="permission-picker" id="permissionPicker" data-composer-control="approval">
               <button type="button" class="composer-text-button approval-control" id="modeButton" title="Change permissions" aria-haspopup="menu" aria-expanded="false"><span class="icon-slot" data-icon="shield"></span><span class="control-label">Ask for approval</span><span class="icon-slot chevron" data-icon="chevronDown"></span></button>
@@ -115,7 +117,6 @@
                 <circle class="context-usage-progress" cx="6" cy="6" r="5" pathLength="100"></circle>
               </svg>
             </span>
-            <button type="button" class="composer-circle-button dictation-control" data-composer-control="dictation" title="Start dictation" aria-label="Start dictation"><span class="icon-slot" data-icon="mic"></span></button>
             <button class="send-button" id="sendButton" data-composer-control="send" type="submit" title="Send message" aria-label="Send message"><span class="icon-slot" data-icon="arrowUp"></span></button>
           </div>
         </div>
@@ -199,24 +200,8 @@
         <div class="summary-row"><span class="icon-slot" data-icon="gitBranch"></span><span id="summaryBranch">Local workspace</span></div>
       </section>
       <section class="summary-section">
-        <h2 class="summary-section-title">Scheduled</h2>
-        <div class="summary-empty">Scheduled task data requires the native desktop bridge.</div>
-      </section>
-      <section class="summary-section">
-        <h2 class="summary-section-title">Computer Use</h2>
-        <div class="summary-empty">Computer Use controls require the native desktop bridge.</div>
-      </section>
-      <section class="summary-section">
-        <h2 class="summary-section-title">Plan</h2>
-        <div class="summary-empty" id="summaryPlan">Plan data is not exposed by app-server.</div>
-      </section>
-      <section class="summary-section">
         <h2 class="summary-section-title">Side tasks</h2>
-        <div class="summary-empty" id="summarySideTasks">Side task data requires the native desktop bridge.</div>
-      </section>
-      <section class="summary-section">
-        <h2 class="summary-section-title">Sources</h2>
-        <div class="summary-empty" id="summarySource">Conversation source data is not exposed by app-server.</div>
+        <div class="summary-empty" id="summarySideTasks">No side tasks</div>
       </section>
     </div>
   </aside>
@@ -240,13 +225,12 @@
   <div class="settings-card">
     <aside class="settings-nav" aria-label="Settings">
       <strong class="sr-only" id="settingsTitle">Settings</strong>
-      <div class="settings-nav-toolbar-spacer" aria-hidden="true"></div>
       <button class="settings-nav-back" id="closeSettingsNav" type="button"><span class="icon-slot" data-icon="chevronLeft"></span><span>Back to app</span></button>
       <label class="settings-search"><span class="icon-slot" data-icon="search"></span><input id="settingsSearch" type="search" aria-label="Search settings" placeholder="Search settings…" autocomplete="off"><button class="settings-search-clear icon-button small" id="clearSettingsSearch" type="button" aria-label="Clear settings search" hidden><span class="icon-slot" data-icon="x"></span></button></label>
       <div class="settings-nav-scroll" id="settingsNavScroll">
-        <section class="settings-nav-group" data-settings-group="personal"><h2>Personal</h2><button type="button" class="active" data-settings-page="general-settings"><span class="icon-slot" data-icon="wrench"></span><span>General</span></button><button type="button" data-settings-page="appearance"><span class="icon-slot" data-icon="monitor"></span><span>Appearance</span></button><button type="button" data-settings-page="agent"><span class="icon-slot" data-icon="terminal"></span><span>Configuration</span></button><button type="button" data-settings-page="profile"><span class="icon-slot" data-icon="userRound"></span><span>Profile</span></button><button type="button" data-settings-page="keyboard-shortcuts"><span class="icon-slot" data-icon="command"></span><span>Keyboard shortcuts</span></button></section>
-        <section class="settings-nav-group" data-settings-group="integrations"><h2>Integrations</h2><button type="button" data-settings-page="plugins-settings"><span class="icon-slot" data-icon="wrench"></span><span>Plugins</span></button><button type="button" data-settings-page="skills-settings"><span class="icon-slot" data-icon="file"></span><span>Skills</span></button><button type="button" data-settings-page="browser-use"><span class="icon-slot" data-icon="globe"></span><span>Browser</span></button><button type="button" data-settings-page="computer-use"><span class="icon-slot" data-icon="monitor"></span><span>Computer use</span></button></section>
-        <section class="settings-nav-group" data-settings-group="coding"><h2>Coding</h2><button type="button" data-settings-page="connections"><span class="icon-slot" data-icon="monitor"></span><span>Connections</span></button><button type="button" data-settings-page="cloud-settings"><span class="icon-slot" data-icon="globe"></span><span>Cloud preferences</span></button><button type="button" data-settings-page="cloud-environments"><span class="icon-slot" data-icon="globe"></span><span>Cloud environments</span></button><button type="button" data-settings-page="code-review"><span class="icon-slot" data-icon="fileDiff"></span><span>Code review</span></button><button type="button" data-settings-page="git-settings"><span class="icon-slot" data-icon="gitBranch"></span><span>Git</span></button><button type="button" data-settings-page="hooks-settings"><span class="icon-slot" data-icon="wrench"></span><span>Hooks</span></button><button type="button" data-settings-page="worktrees"><span class="icon-slot" data-icon="list"></span><span>Worktrees</span></button></section>
+        <section class="settings-nav-group" data-settings-group="personal"><h2>Personal</h2><button type="button" class="active" data-settings-page="general-settings"><span class="icon-slot" data-icon="wrench"></span><span>General</span></button><button type="button" data-settings-page="access-settings" data-settings-available="false" hidden><span class="icon-slot" data-icon="shield"></span><span>Public access</span></button><button type="button" data-settings-page="appearance"><span class="icon-slot" data-icon="monitor"></span><span>Appearance</span></button><button type="button" data-settings-page="agent"><span class="icon-slot" data-icon="terminal"></span><span>Configuration</span></button><button type="button" data-settings-page="profile"><span class="icon-slot" data-icon="userRound"></span><span>Profile</span></button><button type="button" data-settings-page="keyboard-shortcuts"><span class="icon-slot" data-icon="command"></span><span>Keyboard shortcuts</span></button></section>
+        <section class="settings-nav-group" data-settings-group="integrations"><h2>Integrations</h2><button type="button" data-settings-page="plugins-settings"><span class="icon-slot" data-icon="wrench"></span><span>Plugins</span></button><button type="button" data-settings-page="skills-settings"><span class="icon-slot" data-icon="file"></span><span>Skills</span></button><button type="button" data-settings-page="browser-use"><span class="icon-slot" data-icon="globe"></span><span>Browser</span></button></section>
+        <section class="settings-nav-group" data-settings-group="coding"><h2>Coding</h2><button type="button" data-settings-page="connections"><span class="icon-slot" data-icon="monitor"></span><span>MCP servers</span></button><button type="button" data-settings-page="code-review"><span class="icon-slot" data-icon="fileDiff"></span><span>Code review</span></button></section>
         <section class="settings-nav-group" data-settings-group="archived"><h2>Archived</h2><button type="button" data-settings-page="data-controls"><span class="icon-slot" data-icon="list"></span><span>Archived chats</span></button></section>
         <div class="settings-nav-empty" id="settingsNavEmpty" hidden>No results found</div>
       </div>
@@ -265,8 +249,8 @@
           <input id="settingsFullAccessToggle" type="checkbox">
           <span class="settings-switch" aria-hidden="true"></span>
         </label>
-        <div class="settings-row"><span><strong>Selected mode</strong><small>Permission mode used for new turns</small></span><span id="settingsPermissionValue">Ask for approval</span></div>
-        <div class="settings-row"><span><strong>Project</strong><small>Working folder used for new chats</small></span><span id="settingsProjectValue"></span></div>
+        <div class="settings-row"><span><strong>Selected mode</strong><small>Permission mode used for new turns</small></span><button type="button" class="settings-value-button" id="settingsPermissionValue">Ask for approval</button></div>
+        <div class="settings-row"><span><strong>Project</strong><small>Working folder used for new chats</small></span><button type="button" class="settings-value-button" id="settingsProjectValue"></button></div>
         <div class="settings-section-title settings-section-spaced">Notifications</div>
         <label class="settings-row settings-toggle-row" id="settingsTaskNotifyRow">
           <span><strong>Task notifications</strong><small>Show a browser notification when a task completes</small></span>
@@ -275,6 +259,11 @@
         </label>
         <div class="settings-section-title settings-section-spaced">Appearance</div>
         <label class="settings-row settings-select-row"><span><strong>Language</strong><small>Interface language</small></span><select class="settings-select" id="languageSelect"><option value="system">System default</option><option value="zh-CN">简体中文</option><option value="en">English</option></select></label>
+      </section>
+      <section class="settings-page" data-settings-content="appearance" hidden>
+        <header class="settings-page-heading"><button class="settings-mobile-back icon-button" type="button" aria-label="Back to settings"><span class="icon-slot" data-icon="chevronLeft"></span></button><h1>Appearance</h1></header>
+        <label class="settings-row settings-select-row"><span><strong>Theme</strong></span><select class="settings-select" id="themeSelect"><option value="system">System default</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+        <label class="settings-row settings-select-row"><span><strong>Interface scale</strong></span><select class="settings-select" id="interfaceScaleSelect"><option value="75">75%</option><option value="80">80%</option><option value="90">90%</option><option value="100" selected>100%</option><option value="110">110%</option><option value="125">125%</option><option value="150">150%</option></select></label>
       </section>
       <section class="settings-page" data-settings-content="profile" hidden><header class="settings-page-heading"><button class="settings-mobile-back icon-button" type="button" aria-label="Back to settings"><span class="icon-slot" data-icon="chevronLeft"></span></button><h1>Profile</h1></header><div class="settings-account-identity"><span class="account-avatar account-initials" id="settingsAccountAvatar">?</span><span><strong id="settingsAccountName">Settings</strong><small id="settingsAccountMeta"></small></span></div></section>
       <section class="settings-page" data-settings-content="keyboard-shortcuts" hidden><header class="settings-page-heading"><button class="settings-mobile-back icon-button" type="button" aria-label="Back to settings"><span class="icon-slot" data-icon="chevronLeft"></span></button><h1>Keyboard shortcuts</h1></header><div class="shortcut-row"><span>New chat</span><kbd>⌘ K</kbd></div><div class="shortcut-row"><span>Toggle sidebar</span><kbd>⌘ B</kbd></div><div class="shortcut-row"><span>Toggle bottom panel</span><kbd>⌘ J</kbd></div></section>

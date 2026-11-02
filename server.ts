@@ -15,12 +15,15 @@ import { searchWorkspaceFiles } from "./file-search.js";
 import { resolveLocalFile } from "./file-service.js";
 import { resolveLocalImage } from "./image-service.js";
 import { LiveSessionStore } from "./live-session-service.js";
+import { createSettingsService } from "./settings-service.js";
 import {
   createPasswordSession,
   createStoredPassword,
   isAllowedBrowserRpcMethod,
   isAuthorizedHttpRequest,
+  isLocalAuthManagementRequest,
   isRequestAuthorized,
+  isSameOrigin,
   passwordSessionCookie,
   resolvePublicAsset,
   resolveSafeRegularFile,
@@ -28,7 +31,10 @@ import {
   unauthorizedResponse,
   verifyStoredPassword,
 } from "./server-security.js";
-import { loadStoredPassword, passwordStorePath, saveStoredPassword, type StoredPassword } from "./password-store.js";
+import { loadStoredPassword, passwordStorePath, saveStoredPassword, replaceStoredPassword, type StoredPassword } from "./password-store.js";
+import { boundDomainRequest, loadBoundDomain, normalizeBoundDomain, saveBoundDomain } from "./access-policy.js";
+import { validateImageInputs, TURN_REQUEST_MAX_BYTES } from "./public/composer-input.js";
+import { interruptThread } from "./turn-control.js";
 import {
   createAccountIdentityLoader,
   fetchProfileAvatar,
@@ -42,6 +48,8 @@ const port = Number(process.env.PORT || 8899);
 const accessToken = process.env.CODEX_WEBUI_ACCESS_TOKEN || null;
 const environmentPassword = process.env.CODEX_WEBUI_PASSWORD || null;
 const managedPasswordPath = passwordStorePath();
+const domainStorePath = `${managedPasswordPath}.access.json`;
+let boundDomain = loadBoundDomain(domainStorePath);
 let managedPassword: StoredPassword | null = environmentPassword || accessToken ? null : loadStoredPassword(managedPasswordPath);
 let authSecret = environmentPassword || accessToken || storedPasswordSessionSecret(managedPassword);
 let passwordSetupInProgress = false;
@@ -67,6 +75,7 @@ const terminalSessions = new Map<WebSocket, ReturnType<typeof createTerminalSess
 const pending = new Map<number, { resolve: (value: any) => void; reject: (error: Error) => void }>();
 const reviewDiffs = new ReviewDiffStore();
 const liveSessions = new LiveSessionStore();
+const settingsService = createSettingsService(request);
 const threadPaths = new Map<string, string>();
 let codexSessionsRoot = resolve(homeDir, ".codex", "sessions");
 let seq = 1;
@@ -265,8 +274,13 @@ async function dispatchBrowserMessage(message: any) {
     try {
       if (!isAllowedBrowserRpcMethod(message.method)) throw new Error("RPC method is not available to browser clients");
       const params = message.params || {};
-      const result = message.method === "host/thread/live"
+      if (["turn/start", "turn/steer"].includes(message.method)) validateImageInputs(params.input || []);
+      const result = ["host/settings/read", "host/settings/write", "host/skills/set-enabled", "host/mcp/set-enabled"].includes(message.method)
+        ? await settingsService(message.method, params)
+        : message.method === "host/thread/live"
         ? await readLiveThread(params.threadId)
+        : message.method === "turn/interrupt"
+        ? await interruptThread(request, params)
         : await request(message.method, params);
       recordThreadPathsFromRpc(result);
       recordReviewDiffsFromRpc(message.method, params, result);
@@ -296,11 +310,12 @@ async function handleClient(client: WebSocket, message: any) {
 
 function readJsonBody(req: IncomingMessage, maxBytes = 256_000) {
   return new Promise<any>((resolvePromise, reject) => {
-    let body = "", tooLarge = false;
+    let body = "", tooLarge = false, bodyBytes = 0;
     req.setEncoding("utf8");
     req.on("data", chunk => {
       if (tooLarge) return;
-      if (Buffer.byteLength(body) + Buffer.byteLength(chunk) > maxBytes) { tooLarge = true; return; }
+      bodyBytes += Buffer.byteLength(chunk);
+      if (bodyBytes > maxBytes) { tooLarge = true; return; }
       body += chunk;
     });
     req.on("error", reject);
@@ -313,7 +328,7 @@ function readJsonBody(req: IncomingMessage, maxBytes = 256_000) {
 }
 
 function passwordSetupRequired() {
-  return !localhostOnly && !authSecret;
+  return !authSecret;
 }
 
 function browserPasswordConfigured() {
@@ -322,6 +337,8 @@ function browserPasswordConfigured() {
 
 function requestMatchesSecret(req: IncomingMessage, submittedPassword: string, expectedSecret: string | null) {
   if (!submittedPassword || !expectedSecret) return false;
+  req = boundDomainRequest(req, boundDomain);
+  if (!req) return false;
   return isRequestAuthorized({
     remoteAddress: req.socket.remoteAddress,
     hostHeader: req.headers.host,
@@ -336,13 +353,19 @@ function requestMatchesSecret(req: IncomingMessage, submittedPassword: string, e
   });
 }
 
-function validBrowserPassword(req: IncomingMessage, submittedPassword: string) {
+function validBrowserPassword(req: IncomingMessage, submittedPassword: string, username?: string) {
   if (environmentPassword) return requestMatchesSecret(req, submittedPassword, environmentPassword);
   if (managedPassword) {
+    if (managedPassword.username && username !== managedPassword.username) return false;
     if (!requestMatchesSecret(req, submittedPassword, submittedPassword)) return false;
     return verifyStoredPassword(submittedPassword, managedPassword);
   }
   return requestMatchesSecret(req, submittedPassword, accessToken);
+}
+
+function authorizedRequest(req: IncomingMessage) {
+  const accessRequest = boundDomainRequest(req, boundDomain);
+  return Boolean(accessRequest && isAuthorizedHttpRequest(accessRequest, authSecret, isLocalAuthManagementRequest(req), managedPassword));
 }
 
 function sendAuthError(res: ServerResponse, status: number, error: string, extraHeaders: Record<string, string> = {}) {
@@ -377,6 +400,10 @@ const mime: Record<string, string> = {
 };
 
 const server = createServer(async (req, res) => {
+  if (!boundDomainRequest(req, boundDomain)) {
+    sendAuthError(res, 403, "Access is only allowed through 127.0.0.1 or the bound domain");
+    return;
+  }
   let url: URL;
   try { url = new URL(req.url || "/", "http://localhost"); }
   catch {
@@ -387,60 +414,92 @@ const server = createServer(async (req, res) => {
   const appRoute = req.method === "GET" && (url.pathname === "/" || /^\/settings(?:\/[^/]+)?\/?$/.test(url.pathname));
   const loginAssets = new Set(["/", "/index.html", "/style.css", "/favicon.svg", "/auth-bootstrap.js", "/i18n.js", "/codex-brand.js"]);
   if (url.pathname === "/api/auth/status") {
-    const authenticated = isAuthorizedHttpRequest(req, authSecret);
+    const authenticated = authorizedRequest(req);
     res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" });
     res.end(JSON.stringify({
       setupRequired: passwordSetupRequired() && !authenticated,
       passwordRequired: browserPasswordConfigured(),
       authenticated,
+      canManageCredentials: isLocalAuthManagementRequest(req),
+      usernameRequired: Boolean(managedPassword?.username),
     }));
     return;
   }
-  if (url.pathname === "/api/auth/setup") {
+  if (url.pathname === "/api/auth/domain") {
+    if (!isLocalAuthManagementRequest(req)) {
+      sendAuthError(res, 403, "Account settings are only available through http://127.0.0.1");
+      return;
+    }
+    if (req.method === "GET") {
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+      res.end(JSON.stringify({ domain: boundDomain }));
+      return;
+    }
+    if (req.method !== "POST") { sendAuthError(res, 405, "Method not allowed", { allow: "GET, POST" }); return; }
+    let domain: string;
+    try { domain = normalizeBoundDomain((await readJsonBody(req, 4096)).domain); }
+    catch { sendAuthError(res, 400, "Enter a domain without a protocol, port or path"); return; }
+    try { saveBoundDomain(domainStorePath, domain); }
+    catch { sendAuthError(res, 500, "Unable to save domain binding"); return; }
+    boundDomain = domain;
+    for (const client of clients) client.close(1008, "Domain binding changed");
+    for (const client of terminalSessions.keys()) client.close(1008, "Domain binding changed");
+    for (const stream of sseClients) stream.end();
+    res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+    res.end(JSON.stringify({ domain: boundDomain }));
+    return;
+  }
+  if (url.pathname === "/api/auth/setup" || url.pathname === "/api/auth/credentials") {
+    if (!isLocalAuthManagementRequest(req)) {
+      sendAuthError(res, 403, "Account settings are only available through http://127.0.0.1");
+      return;
+    }
+    if (req.method === "GET" && url.pathname === "/api/auth/credentials") {
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+      res.end(JSON.stringify({ configured: browserPasswordConfigured(), username: managedPassword?.username || "codex", editable: !environmentPassword && !accessToken }));
+      return;
+    }
     if (req.method !== "POST") {
-      sendAuthError(res, 405, "Method not allowed", { allow: "POST" });
+      sendAuthError(res, 405, "Method not allowed", { allow: "GET, POST" });
+      return;
+    }
+    if (environmentPassword || accessToken) {
+      sendAuthError(res, 409, "Credentials are managed by startup environment variables");
+      return;
+    }
+    if (passwordSetupInProgress || (url.pathname === "/api/auth/setup" && browserPasswordConfigured())) {
+      sendAuthError(res, 409, "Account settings have changed. Refresh and try again.");
       return;
     }
     let payload: any;
     try { payload = await readJsonBody(req, 4096); }
-    catch (error) {
-      sendAuthError(res, 400, error instanceof Error ? error.message : "Invalid setup request");
+    catch { sendAuthError(res, 400, "Invalid account settings"); return; }
+    const username = typeof payload?.username === "string" ? payload.username.trim() : "";
+    const submittedPassword = typeof payload?.password === "string" ? payload.password : "";
+    if (!/^[a-zA-Z0-9_.-]{1,64}$/.test(username)) {
+      sendAuthError(res, 400, "Username must be 1–64 letters, numbers, dots, underscores or hyphens");
       return;
     }
-    const submittedPassword = typeof payload?.password === "string" ? payload.password : "";
     if (submittedPassword.length < 12 || submittedPassword.length > 256) {
       sendAuthError(res, 400, "Password must be between 12 and 256 characters");
       return;
     }
-    if (!requestMatchesSecret(req, submittedPassword, submittedPassword)) {
-      sendAuthError(res, 403, "Password setup request was rejected");
-      return;
-    }
-    if (!passwordSetupRequired() || passwordSetupInProgress) {
-      sendAuthError(res, 409, "Password setup is no longer available");
-      return;
-    }
     passwordSetupInProgress = true;
     try {
-      const credential = createStoredPassword(submittedPassword) as StoredPassword;
-      saveStoredPassword(managedPasswordPath, credential);
+      const credential: StoredPassword = { ...createStoredPassword(submittedPassword), username };
+      if (managedPassword) replaceStoredPassword(managedPasswordPath, credential);
+      else saveStoredPassword(managedPasswordPath, credential);
       managedPassword = credential;
       authSecret = storedPasswordSessionSecret(credential);
       issueBrowserSession(req, res);
+      // Existing remote connections must authenticate again after credential rotation.
+      for (const client of clients) client.close(1008, "Account settings changed");
+      for (const client of terminalSessions.keys()) client.close(1008, "Account settings changed");
+      for (const stream of sseClients) stream.end();
     } catch (error: any) {
-      if (error?.code === "EEXIST") {
-        try {
-          managedPassword = loadStoredPassword(managedPasswordPath);
-          authSecret = storedPasswordSessionSecret(managedPassword);
-        } catch { /* Keep the original exclusive-create failure as the response. */ }
-        sendAuthError(res, 409, "Password setup is no longer available");
-      } else {
-        console.error("[codex-webui] password setup failed", error);
-        sendAuthError(res, 500, "Unable to save the password");
-      }
-    } finally {
-      passwordSetupInProgress = false;
-    }
+      console.error("[codex-webui] account settings save failed", error?.code || "write error");
+      sendAuthError(res, error?.code === "EEXIST" ? 409 : 500, "Unable to save account settings");
+    } finally { passwordSetupInProgress = false; }
     return;
   }
   if (url.pathname === "/api/auth/login") {
@@ -451,18 +510,23 @@ const server = createServer(async (req, res) => {
     let payload: any;
     try { payload = await readJsonBody(req, 4096); }
     catch {
-      sendAuthError(res, 401, "Incorrect password");
+      sendAuthError(res, 401, "Incorrect username or password");
       return;
     }
     const submittedPassword = typeof payload?.password === "string" ? payload.password : "";
-    if (!validBrowserPassword(req, submittedPassword)) {
-      sendAuthError(res, 401, "Incorrect password");
+    const loginRequest = boundDomainRequest(req, boundDomain);
+    if (req.headers["sec-fetch-site"] === "cross-site" || !isSameOrigin(req.headers.origin, loginRequest.headers.host)) {
+      sendAuthError(res, 403, "Request origin does not match the access domain");
+      return;
+    }
+    if (!validBrowserPassword(req, submittedPassword, typeof payload?.username === "string" ? payload.username : undefined)) {
+      sendAuthError(res, 401, "Incorrect username or password");
       return;
     }
     issueBrowserSession(req, res);
     return;
   }
-  if (!isAuthorizedHttpRequest(req, authSecret)) {
+  if (!authorizedRequest(req)) {
     if (appRoute || loginAssets.has(url.pathname)) {
       const file = resolvePublicAsset(appRoute ? "/" : url.pathname, publicDir);
       if (file) {
@@ -501,7 +565,7 @@ const server = createServer(async (req, res) => {
       return;
     }
     try {
-      const payload = await readJsonBody(req);
+      const payload = await readJsonBody(req, url.pathname === "/api/rpc" ? TURN_REQUEST_MAX_BYTES : 256_000);
       const message = url.pathname === "/api/rpc"
         ? { type: "rpc", id: payload.id, method: payload.method, params: payload.params || {} }
         : { type: payload.error ? "codex/error" : "codex/response", requestId: payload.requestId, result: payload.result, error: payload.error };
@@ -729,13 +793,13 @@ const sseKeepalive = setInterval(() => {
 }, 25_000);
 sseKeepalive.unref();
 
-const wss = new WebSocketServer({ noServer: true });
+const wss = new WebSocketServer({ noServer: true, maxPayload: TURN_REQUEST_MAX_BYTES });
 const terminalWss = new WebSocketServer({ noServer: true });
 server.on("upgrade", (req, socket, head) => {
   let pathname = "";
   try { pathname = new URL(req.url || "/", "http://localhost").pathname; }
   catch { socket.destroy(); return; }
-  if ((pathname !== "/ws" && pathname !== "/terminal") || !isAuthorizedHttpRequest(req, authSecret)) {
+  if ((pathname !== "/ws" && pathname !== "/terminal") || !authorizedRequest(req)) {
     const body = JSON.stringify({ error: "Authentication required" });
     socket.end([
       "HTTP/1.1 401 Unauthorized",
@@ -815,7 +879,7 @@ if (!frontendBuild.success) throw new Error(`Frontend build failed: ${frontendBu
 startCodex();
 server.listen(port, host, () => {
   console.log(`Codex WebUI listening on http://${host}:${port}`);
-  if (passwordSetupRequired()) console.warn(`[codex-webui] LAN password setup is required; the first LAN visitor will create it in ${managedPasswordPath}`);
+  if (passwordSetupRequired()) console.warn(`[codex-webui] Configure public access credentials at http://127.0.0.1:${port}/settings/access-settings`);
   if (!localhostOnly) {
     const addresses = Object.values(networkInterfaces()).flat().filter((entry): entry is NonNullable<typeof entry> => !!entry && entry.family === "IPv4" && !entry.internal);
     for (const entry of addresses) console.log(`LAN: http://${entry.address}:${port} (authentication required)`);

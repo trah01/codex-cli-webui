@@ -86,7 +86,7 @@ To listen on your LAN, start the server without an authentication variable:
 HOST=0.0.0.0 bun run start
 ```
 
-The first LAN browser sees a password setup screen. After a password of at least 12 characters is confirmed, Codex WebUI stores only a salted `scrypt` credential in `~/.codex/codex-webui-auth.json`, signs in that browser, and requires the password after a restart. Because the first reachable LAN client can claim this setup, complete it only on a trusted network.
+Open `http://127.0.0.1:8899/settings/access-settings` directly on the server to create or change the public access username and password (12–256 characters). Credential management rejects domains, LAN addresses, `localhost`, IPv6 loopback and forwarded requests. Passwords are stored as salted `scrypt` hashes in `~/.codex/codex-webui-auth.json`; saving new credentials invalidates existing sessions. Remote visitors cannot claim initial setup.
 
 For unattended deployments, provide the password at startup instead:
 
@@ -94,9 +94,11 @@ For unattended deployments, provide the password at startup instead:
 HOST=0.0.0.0 CODEX_WEBUI_PASSWORD='use-a-long-random-password' bun run start
 ```
 
-Direct `localhost` access remains available without the password screen. LAN requests must set or enter a password before the main application bundle, HTTP APIs, or WebSocket bridges are available. Successful authentication uses a signed `HttpOnly`, `SameSite=Strict` session cookie.
+Save a bound domain in the same settings page to enable remote access. Only direct `127.0.0.1` access is allowed until a domain is bound; other IP addresses, `localhost`, IPv6, and unbound domains are rejected. Domain settings are stored next to the credential file as `codex-webui-auth.json.access.json`. Reverse proxies must preserve the external `Host` or supply an accurate `X-Forwarded-Host`, including the external port when applicable. Only the configured domain is accepted from this forwarded header. Domain binding does not configure DNS or TLS. Remote requests must sign in before the main application bundle, HTTP APIs, or WebSocket bridges are available. Successful authentication uses a signed `HttpOnly`, `SameSite=Strict` session cookie.
 
 `CODEX_WEBUI_ACCESS_TOKEN` remains available for compatibility with Basic/Bearer clients. `CODEX_WEBUI_PASSWORD` takes precedence over both the managed password and access token for browser login. Set `CODEX_WEBUI_AUTH_STORE` to move the managed credential file.
+
+Paste images into the composer or use the plus button to select PNG, JPEG, WebP or GIF files. Image-only messages are supported. Limits: 10 MB per image, 10 images and 20 MB total per message. Configure reverse proxies to accept at least 30 MB request bodies (for Nginx: `client_max_body_size 30m;`).
 
 ## Configuration
 

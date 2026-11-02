@@ -78,7 +78,7 @@ http://127.0.0.1:8899
 
 默认只监听 localhost。点击 Composer 或侧栏中的文件夹按钮，即可选择 Codex 的工作目录。
 
-### 局域网密码
+### 公网准入账号与密码
 
 未配置认证变量时，可以直接监听局域网：
 
@@ -86,15 +86,17 @@ http://127.0.0.1:8899
 HOST=0.0.0.0 bun run start
 ```
 
-首个通过局域网访问的浏览器会看到密码设置页。确认至少 12 个字符的密码后，Codex WebUI 只把加盐后的 `scrypt` 凭据保存在 `~/.codex/codex-webui-auth.json`，并立即登录当前浏览器；服务重启后会显示普通登录页。由于第一个可访问该地址的局域网客户端拥有初始化权，请只在可信网络中完成首次设置。
+在服务器本机打开 `http://127.0.0.1:8899/settings/access-settings`，设置公网访问使用的账号和密码；密码至少 12 位。账号密码只能通过直接连接的 `127.0.0.1` 页面创建和修改，公网域名、局域网 IP、`localhost`、IPv6 回环地址及代理转发请求均不能操作。凭据保存在 `~/.codex/codex-webui-auth.json`，密码仅保存加盐后的 `scrypt` 哈希；修改后旧会话失效，已连接的会话需要重新登录。未配置时，远程页面只显示本机配置提示。
 
-无人值守部署也可以在启动时直接指定密码：
+无人值守部署也可以在启动时直接指定密码；配置环境变量后，页面不能覆盖该密码：
 
 ```bash
 HOST=0.0.0.0 CODEX_WEBUI_PASSWORD='use-a-long-random-password' bun run start
 ```
 
-localhost 仍可直接访问。局域网客户端在设置或输入密码前，无法访问应用 Bundle、HTTP API 和 WebSocket bridge。认证成功后使用签名的 `HttpOnly`、`SameSite=Strict` 会话 Cookie。
+在同一设置页填写绑定域名（例如 `codex.example.com`）并保存。未绑定时仅允许直接通过 `127.0.0.1` 访问；绑定后只允许 `127.0.0.1` 和该域名，其他域名、局域网 IP、`localhost` 和 IPv6 地址均被拒绝。域名配置保存在凭据文件旁的 `codex-webui-auth.json.access.json`，修改域名无需重新设置密码。反向代理应保留外部 `Host`，或传递准确的 `X-Forwarded-Host`（域名及外部端口）；后端只接受与绑定域名匹配的转发地址。域名绑定不替代反向代理和 TLS 配置。远程客户端在登录前，无法访问应用 Bundle、HTTP API 和 WebSocket bridge。认证成功后使用签名的 `HttpOnly`、`SameSite=Strict` 会话 Cookie。
+
+输入框支持直接粘贴图片，也可以点击加号选择 PNG、JPEG、WebP 或 GIF；可单独发送图片。每张最多 10 MB，每次最多 10 张、合计 20 MB。反向代理的请求体大小限制应至少设为 30 MB（Nginx 可使用 `client_max_body_size 30m;`）。
 
 ## 配置
 
@@ -120,7 +122,7 @@ bun run start
 | `HOST` | `127.0.0.1` | HTTP/WebSocket 监听地址 |
 | `PORT` | `8899` | HTTP/WebSocket 端口 |
 | `CODEX_WEBUI_PASSWORD` | 未设置 | 可选的局域网浏览器登录密码；设置后跳过首次初始化页 |
-| `CODEX_WEBUI_AUTH_STORE` | `$CODEX_HOME/codex-webui-auth.json` | 首次初始化生成的加盐密码凭据文件 |
+| `CODEX_WEBUI_AUTH_STORE` | `$CODEX_HOME/codex-webui-auth.json` | 本机设置生成的账号及加盐密码凭据文件 |
 | `CODEX_WEBUI_ACCESS_TOKEN` | 未设置 | Basic/Bearer 客户端兼容密钥；未配置密码时也可用于浏览器登录，用户名为 `codex` |
 | `CODEX_WEBUI_CWD` | 仓库目录 | Codex 初始工作目录 |
 | `CODEX_WEBUI_REVIEW_ROOT` | 与 `CODEX_WEBUI_CWD` 相同 | 允许 Undo/Reapply 的精确 Git 根目录 |
@@ -133,8 +135,8 @@ bun run start
 Codex WebUI 可以在本机批准执行命令和修改文件，应把它视为拥有 Shell 能力的本地开发工具。
 
 - 不要把 `8899` 端口直接暴露到公网。
-- 默认只监听 `127.0.0.1`。监听非 localhost 地址时，必须先完成首次密码设置，或配置 `CODEX_WEBUI_PASSWORD` / `CODEX_WEBUI_ACCESS_TOKEN`，受保护的 HTTP 与 WebSocket 请求才会放行。
-- 浏览器 RPC 使用明确白名单，无法调用 app-server 的 `fs/*`、`config/*` 或账号方法。
+- 默认只监听 `127.0.0.1`。监听非 localhost 地址时，必须先在本机设置准入账号密码，或配置 `CODEX_WEBUI_PASSWORD` / `CODEX_WEBUI_ACCESS_TOKEN`，并在本机设置中绑定访问域名，受保护的 HTTP 与 WebSocket 请求才会放行。
+- 浏览器 RPC 使用明确白名单，不开放通用文件或配置读写；设置修改通过后端限定字段的接口处理。
 - 静态文件使用资源白名单，并拒绝所有符号链接。
 - 文件夹浏览会 canonicalize 路径，拒绝通过 symlink 逃逸用户 Home 目录。
 - Review Undo/Reapply 只使用服务端持有的 app-server Diff，拒绝客户端提交 `cwd`/Diff、符号链接补丁和 `.git`、`.env`、`node_modules` 等敏感目标。

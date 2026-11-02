@@ -123,11 +123,11 @@ export function applyRolloutEvent(state, event) {
     return state;
   }
   if (!state.turn) return state;
-  if (event.type === "event_msg" && payload.type === "task_complete" && payload.turn_id === state.turn.id) {
+  if (event.type === "event_msg" && ["task_complete", "turn_aborted"].includes(payload.type) && (!payload.turn_id || payload.turn_id === state.turn.id)) {
     state.active = false;
-    state.turn.status = "completed";
+    state.turn.status = payload.type === "turn_aborted" ? "interrupted" : "completed";
     if (Number.isFinite(payload.completed_at)) state.turn.completedAt = payload.completed_at;
-    for (const item of state.turn.items) if (item.status === "inProgress") item.status = "completed";
+    for (const item of state.turn.items) if (item.status === "inProgress") item.status = state.turn.status;
     state.activeCommandId = null;
     return state;
   }

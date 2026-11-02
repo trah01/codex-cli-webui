@@ -5,8 +5,16 @@ import { resolve, sep } from "node:path";
 const BROWSER_RPC_METHODS = new Set([
   "model/list",
   "permissionProfile/list",
+  "skills/list",
+  "mcpServerStatus/list",
+  "plugin/installed",
+  "host/settings/read",
+  "host/settings/write",
+  "host/skills/set-enabled",
+  "host/mcp/set-enabled",
   "account/logout",
   "thread/list",
+  "thread/unarchive",
   "thread/read",
   "thread/delete",
   "thread/resume",
@@ -92,6 +100,7 @@ export function createStoredPassword(password, { salt = randomBytes(16).toString
 
 export function isStoredPassword(value) {
   return value?.version === STORED_PASSWORD_VERSION
+    && (value.username === undefined || (typeof value.username === "string" && /^[a-zA-Z0-9_.-]{1,64}$/.test(value.username)))
     && value?.algorithm === "scrypt"
     && typeof value?.salt === "string"
     && value.salt.length >= 16
@@ -126,7 +135,7 @@ function isLoopbackHost(hostHeader) {
   return host === "127.0.0.1" || host === "::1" || host === "localhost";
 }
 
-function isSameOrigin(origin, hostHeader) {
+export function isSameOrigin(origin, hostHeader) {
   if (!origin) return true;
   try { return new URL(origin).host.toLowerCase() === String(hostHeader || "").toLowerCase(); }
   catch { return false; }
@@ -146,6 +155,16 @@ function suppliedToken(authorization) {
 
 export function isAllowedBrowserRpcMethod(method) {
   return typeof method === "string" && BROWSER_RPC_METHODS.has(method);
+}
+
+export function isLocalAuthManagementRequest(req) {
+  const address = String(req.socket?.remoteAddress || "").replace(/^::ffff:/, "");
+  const headers = req.headers || {};
+  return address === "127.0.0.1"
+    && /^127\.0\.0\.1(?::[0-9]+)?$/.test(headers.host || "")
+    && !["forwarded", "x-forwarded-for", "x-forwarded-host", "x-forwarded-proto", "x-real-ip"].some(name => headers[name] !== undefined)
+    && headers["sec-fetch-site"] !== "cross-site"
+    && isSameOrigin(headers.origin, headers.host);
 }
 
 export function isRequestAuthorized({ remoteAddress, hostHeader, authorization, accessToken, cookie = null, origin = null, fetchSite = null, forwardedFor = null, forwarded = null, realIp = null, allowLoopback = true, now = Date.now() }) {
@@ -192,11 +211,18 @@ export function unauthorizedResponse(res) {
   res.end(JSON.stringify({ error: "Authentication required" }));
 }
 
-export function isAuthorizedHttpRequest(req, accessToken, allowLoopback = true) {
+export function isAuthorizedHttpRequest(req, accessToken, allowLoopback = true, managedCredential = null) {
+  let authorization = req.headers.authorization;
+  if (managedCredential && authorization?.startsWith("Basic ")) {
+    const decoded = Buffer.from(authorization.slice(6), "base64").toString("utf8");
+    const separator = decoded.indexOf(":");
+    if (separator < 0 || decoded.slice(0, separator) !== (managedCredential.username || "codex") || !verifyStoredPassword(decoded.slice(separator + 1), managedCredential)) return false;
+    authorization = `Bearer ${accessToken}`;
+  }
   return isRequestAuthorized({
     remoteAddress: req.socket.remoteAddress,
     hostHeader: req.headers.host,
-    authorization: req.headers.authorization,
+    authorization,
     cookie: req.headers.cookie,
     accessToken,
     origin: req.headers.origin,

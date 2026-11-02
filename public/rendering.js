@@ -88,6 +88,7 @@ function imageSource(source, cwd = "", explicit = false) {
 }
 
 function imageTitle(source = "") {
+  if (/^(?:data:|blob:)/i.test(source)) return "Image";
   const reference = parseFileReference(source);
   const value = reference?.path || source;
   const name = String(value).split(/[\\/]/).filter(Boolean).at(-1) || "Image";

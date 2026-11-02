@@ -20,16 +20,9 @@ const slash=await page.evaluate(()=>({
   onscreen:document.querySelector('#composerAutocomplete').getBoundingClientRect().top>=46,
   topmost:(()=>{const rect=document.querySelector('#composerAutocomplete').getBoundingClientRect();return Boolean(document.elementFromPoint(rect.left+12,rect.top+12)?.closest('#composerAutocomplete'))})(),
 }));
-await page.locator('#prompt').fill('/pla');
+await page.locator('#prompt').fill('/rea');
 const filtered=await page.locator('#composerAutocomplete [data-autocomplete-id]').allTextContents();
-await page.keyboard.press('Enter');
-const plan=await page.evaluate(()=>({
-  active:globalThis.__codexWebuiDebug.state.planMode,
-  placeholder:document.querySelector('#prompt').placeholder,
-  value:document.querySelector('#prompt').value,
-  menuHidden:document.querySelector('#composerAutocomplete').hidden,
-  approval:document.querySelector('#modeButton .control-label').textContent.trim(),
-}));
+await page.keyboard.press('Escape');
 
 await page.locator('#prompt').fill('/model');
 await page.keyboard.press('Enter');
@@ -52,7 +45,7 @@ await mobile.locator('#prompt').fill('/');
 await mobile.waitForSelector('#composerAutocomplete:not([hidden])');
 const mobileLayout=await mobile.evaluate(()=>{const menu=document.querySelector('#composerAutocomplete').getBoundingClientRect(),composer=document.querySelector('.composer').getBoundingClientRect();return{left:menu.left,right:menu.right,top:menu.top,bottom:menu.bottom,composerTop:composer.top,scrollWidth:document.documentElement.scrollWidth,innerWidth}});
 await mobile.close();
-console.log(JSON.stringify({slash,filtered,plan,modelCommand,mentionEmpty,mentionResults,mentionSelected,reset,mobileLayout,errors},null,2));
+console.log(JSON.stringify({slash,filtered,modelCommand,mentionEmpty,mentionResults,mentionSelected,reset,mobileLayout,errors},null,2));
 await browser.close();
 
 const ids=slash.items.map(item=>item.id);
@@ -60,14 +53,10 @@ if(errors.length
   ||slash.type!=='slash'
   ||slash.label!=='Slash command menu'
   ||!slash.above||!slash.onscreen||!slash.topmost
-  ||!['model','plan','project','reasoning','init','mcp'].every(id=>ids.includes(id))
+  ||!['model','project','reasoning','init','mcp'].every(id=>ids.includes(id))
+  ||ids.some(id=>['plan','compact'].includes(id))
   ||slash.items.some(item=>!item.title||!item.description)
-  ||filtered.length!==1||!/Plan mode/i.test(filtered[0])
-  ||!plan.active
-  ||plan.placeholder!=='Describe your task to generate a plan...'
-  ||plan.value!==''
-  ||!plan.menuHidden
-  ||plan.approval!=='Plan mode'
+  ||filtered.length!==1||!/Reasoning/i.test(filtered[0])
   ||!modelCommand.autocompleteHidden
   ||!modelCommand.modelOpen
   ||modelCommand.modelTitle!=='Reasoning'

@@ -7,6 +7,14 @@ import { LiveSessionStore, parseRollout } from "../live-session-service.js";
 const line = (type: string, payload: any, timestamp = "2026-08-11T06:26:25.000Z") => JSON.stringify({ timestamp, type, payload }) + "\n";
 
 describe("Desktop-style live session reader", () => {
+  test("an aborted turn does not remain active or override a later turn", () => {
+    const started = line("event_msg", { type: "task_started", turn_id: "turn-1" });
+    const aborted = parseRollout(started + line("event_msg", { type: "turn_aborted", turn_id: "turn-1", reason: "interrupted" }));
+    expect(aborted.active).toBe(false);
+    expect(aborted.turn.status).toBe("interrupted");
+    expect(parseRollout(started + line("event_msg", { type: "turn_aborted", turn_id: "older-turn" })).active).toBe(true);
+    expect(parseRollout(started + line("event_msg", { type: "turn_aborted", reason: "interrupted" })).active).toBe(false);
+  });
   test("reconstructs an active CLI command and its available output", () => {
     const input = [
       line("event_msg", { type: "task_started", turn_id: "turn-1", started_at: 10 }),

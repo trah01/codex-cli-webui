@@ -30,7 +30,7 @@ await page.evaluate(()=>{
 });
 await page.click('#accountButton');
 const chatgpt=await page.evaluate(()=>({
-  product:document.querySelector('#productModeButton strong')?.textContent.trim(),
+  product:document.querySelector('.sidebar-product strong')?.textContent.trim(),
   newChat:document.querySelector('#newTask span:nth-child(2)')?.textContent.trim(),
   search:document.querySelector('#threadSearch')?.placeholder,
   projects:document.querySelector('#projectButton')?.textContent.trim(),
@@ -38,7 +38,7 @@ const chatgpt=await page.evaluate(()=>({
   footerMeta:document.querySelector('#accountFooterMeta')?.textContent.trim(),
   buttonLabel:document.querySelector('#accountButton')?.getAttribute('aria-label'),
   profileHidden:document.querySelector('#accountProfile')?.hidden,
-  usageHidden:document.querySelector('#accountUsage')?.hidden,
+  usageAbsent:!document.querySelector('#accountUsage'),
   logoutHidden:document.querySelector('#accountLogout')?.hidden,
 }));
 await page.click('#accountSettings');
@@ -50,7 +50,7 @@ const settingsShell=await page.evaluate(()=>({
   back:document.querySelector('#closeSettingsNav')?.textContent.trim(),
   route:location.pathname,
   modal:document.querySelector('#settingsDialog').matches(':modal'),
-  navSpacer:document.querySelector('.settings-nav-toolbar-spacer')?.getBoundingClientRect().height,
+  navSpacer:document.querySelector('.settings-nav-toolbar-spacer')?.getBoundingClientRect().height||0,
 }));
 await page.click('[data-settings-page="agent"]');
 const configuration=await page.evaluate(()=>({
@@ -146,7 +146,7 @@ const apiKey=await page.evaluate(()=>({
   footerName:document.querySelector('#accountName')?.textContent.trim(),
   footerMeta:document.querySelector('#accountFooterMeta')?.textContent.trim(),
   profileHidden:document.querySelector('#accountProfile')?.hidden,
-  usageHidden:document.querySelector('#accountUsage')?.hidden,
+  usageAbsent:!document.querySelector('#accountUsage'),
   settingsHidden:document.querySelector('#accountSettings')?.hidden,
   logoutHidden:document.querySelector('#accountLogout')?.hidden,
   avatarClass:document.querySelector('#accountAvatar')?.className,
@@ -192,8 +192,8 @@ console.log(JSON.stringify({chatgpt,settingsShell,configuration,settingsSearch,s
 await browser.close();
 if(
   errors.length||
-  chatgpt.product!=='Codex'||chatgpt.newChat!=='New chat'||chatgpt.search!=='Search chats'||chatgpt.projects!=='Projects'||chatgpt.footerName!=='Desktop User'||chatgpt.footerMeta!==''||chatgpt.buttonLabel!=='Open profile menu'||chatgpt.profileHidden||chatgpt.usageHidden||chatgpt.logoutHidden||
-  settingsShell.groups.join('|')!=='Personal|Integrations|Coding|Archived'||!settingsShell.pages.includes('Configuration')||!settingsShell.pages.includes('Cloud preferences')||!settingsShell.fullPage||settingsShell.back!=='Back to app'||settingsShell.route!=='/settings/general-settings'||settingsShell.modal||settingsShell.navSpacer!==46||configuration.title!=='Configuration'||configuration.route!=='/settings/agent'||!configuration.values.some(value=>value.startsWith('Model'))||settingsSearch.visible.join('|')!=='Browser'||settingsSearch.groups.join('|')!=='Integrations'||!settingsSearch.clearVisible||
+  chatgpt.product!=='Codex'||chatgpt.newChat!=='New chat'||chatgpt.search!=='Search chats'||chatgpt.projects!=='Projects'||chatgpt.footerName!=='Desktop User'||chatgpt.footerMeta!==''||chatgpt.buttonLabel!=='Open profile menu'||chatgpt.profileHidden||!chatgpt.usageAbsent||chatgpt.logoutHidden||
+  settingsShell.groups.join('|')!=='Personal|Integrations|Coding|Archived'||!settingsShell.pages.includes('Configuration')||settingsShell.pages.some(page=>['Cloud preferences','Cloud environments','Computer use','Git','Hooks','Worktrees'].includes(page))||!settingsShell.fullPage||settingsShell.back!=='Back to app'||settingsShell.route!=='/settings/general-settings'||settingsShell.modal||settingsShell.navSpacer!==0||configuration.title!=='Configuration'||configuration.route!=='/settings/agent'||!configuration.values.some(value=>value.startsWith('Model'))||settingsSearch.visible.join('|')!=='Browser'||settingsSearch.groups.join('|')!=='Integrations'||!settingsSearch.clearVisible||
   !settings.open||settings.title!=='Settings'||settings.page!=='General'||settings.permission!=='Ask for approval'||!settings.autoReviewHidden||!settings.autoReviewChecked||!settings.fullAccessChecked||
   !permissionMenu.open||permissionMenu.options.join('|')!=='Ask for approval|Approve for me|Full access|team-safe|managed-blocked'||!permissionMenu.blockedDisabled||
   guardian.selected.approvalsReviewer!=='auto_review'||guardian.thread.approvalPolicy!=='on-request'||guardian.thread.approvalsReviewer!=='auto_review'||guardian.thread.sandbox!=='workspace-write'||guardian.turn.approvalsReviewer!=='auto_review'||guardian.turn.sandboxPolicy.type!=='workspaceWrite'||guardian.turn.permissions!==null||
@@ -201,5 +201,5 @@ if(
   !fullAccessDialog.modal||Math.abs(fullAccessDialog.centerX-fullAccessDialog.viewportX)>1||Math.abs(fullAccessDialog.centerY-fullAccessDialog.viewportY)>1||
   fullAccess.label!=='Full access'||fullAccess.mode!=='full-access'||fullAccess.selected.approvalPolicy!=='never'||fullAccess.selected.sandbox!=='danger-full-access'||fullAccess.thread.approvalPolicy!=='never'||fullAccess.thread.approvalsReviewer!=='user'||fullAccess.thread.sandbox!=='danger-full-access'||fullAccess.turn.sandboxPolicy.type!=='dangerFullAccess'||
   fullAccessSettingOff.checked||fullAccessSettingOff.visible||fullAccessSettingOff.mode!=='default'||!fullAccessSettingOn.checked||!fullAccessSettingOn.visible||fullAccessSettingOn.mode!=='default'||
-  apiKey.footerName!=='API key'||apiKey.footerMeta!==''||apiKey.buttonLabel!=='Open settings'||apiKey.avatarClass!=='account-avatar account-settings-icon'||apiKey.avatarIcon!==1||!apiKey.profileHidden||!apiKey.usageHidden||apiKey.settingsHidden||!apiKey.logoutHidden||!apiSettings.autoReviewHidden||mobileSettings.horizontalOverflow||mobileSettings.dialog.width!==mobileSettings.viewport.width||mobileSettings.pageVisible!=='true'||mobileSettings.navWidth!==0||mobileSettings.contentWidth!==mobileSettings.viewport.width||mobileSettingsNavigation.pageVisible!=='false'||mobileSettingsNavigation.navWidth!==mobileSettings.viewport.width||mobileSettingsNavigation.contentWidth!==0||directSettings.route!=='/settings/browser-use'||directSettings.title!=='Browser'||directSettings.modal||directSettings.closedRoute!=='/'
+  apiKey.footerName!=='API key'||apiKey.footerMeta!==''||apiKey.buttonLabel!=='Open settings'||apiKey.avatarClass!=='account-avatar account-settings-icon'||apiKey.avatarIcon!==1||!apiKey.profileHidden||!apiKey.usageAbsent||apiKey.settingsHidden||!apiKey.logoutHidden||!apiSettings.autoReviewHidden||mobileSettings.horizontalOverflow||mobileSettings.dialog.width!==mobileSettings.viewport.width||mobileSettings.pageVisible!=='true'||mobileSettings.navWidth!==0||mobileSettings.contentWidth!==mobileSettings.viewport.width||mobileSettingsNavigation.pageVisible!=='false'||mobileSettingsNavigation.navWidth!==mobileSettings.viewport.width||mobileSettingsNavigation.contentWidth!==0||directSettings.route!=='/settings/browser-use'||directSettings.title!=='Browser'||directSettings.modal||directSettings.closedRoute!=='/'
 )process.exit(1);
