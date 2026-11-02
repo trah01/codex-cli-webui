@@ -129,8 +129,37 @@ async function loadAccount(refresh=false){
   const requestId=accountRequestGate.next();
   try{const response=await fetch(`/api/account${refresh?'?refresh=1':''}`,{cache:'no-store'}),account=await response.json();if(!response.ok)throw new Error(account.error||'Cannot load account');if(!accountRequestGate.isCurrent(requestId))return;state.account=account;renderAccount(account)}catch{if(accountRequestGate.isCurrent(requestId))renderAccount({displayName:null,avatarUrl:null,planType:null,initials:'?'})}
 }
+let profileSaving=false,profileAvatarData=null,profileAvatarRead=0;
+$('#profileAvatarFile').addEventListener('change',async event=>{
+  const file=event.target.files?.[0],feedback=$('#profileFeedback'),generation=++profileAvatarRead;
+  profileAvatarData=null;feedback.textContent='';
+  if(!file){if(state.account)renderAccount(state.account);return}
+  if(!['image/png','image/jpeg','image/webp','image/gif'].includes(file.type)||file.size>2*1024*1024){event.target.value='';feedback.textContent=t('Use a PNG, JPEG, WebP or GIF image up to 2 MB.');return}
+  $('#saveProfile').disabled=true;
+  try{
+    const data=await new Promise((resolve,reject)=>{const reader=new FileReader;reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('Could not read image. Choose another image.'));reader.readAsDataURL(file)});
+    const image=new Image;image.alt='';image.src=data;await image.decode();
+    if(generation!==profileAvatarRead)return;
+    profileAvatarData=data;const avatar=$('#settingsAccountAvatar');avatar.dataset.imageUrl='';avatar.className='account-avatar';avatar.replaceChildren(image);
+  }catch{if(generation===profileAvatarRead){event.target.value='';feedback.textContent=t('Could not read image. Choose another image.')}}
+  finally{if(generation===profileAvatarRead)$('#saveProfile').disabled=profileSaving||!state.account?.type}
+});
+$('#profileForm').addEventListener('submit',async event=>{
+  event.preventDefault();if(profileSaving)return;
+  const input=$('#profileDisplayName'),feedback=$('#profileFeedback'),button=$('#saveProfile'),displayName=input.value.trim();
+  if(!displayName){input.focus();return}
+  profileSaving=true;$('#profileAvatarFile').disabled=true;input.disabled=true;button.disabled=true;button.textContent=t('Saving profile…');feedback.textContent='';
+  accountRequestGate.next();
+  try{
+    const response=await fetch('/api/account',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({displayName,...(profileAvatarData?{avatar:profileAvatarData}:{})})});
+    const account=await response.json();if(!response.ok)throw new Error(account.error||'Could not save profile. Try again.');
+    accountRequestGate.next();profileAvatarData=null;$('#profileAvatarFile').value='';renderAccount(account);input.value=account.displayName;feedback.textContent=t('Profile saved.');
+  }catch(error){feedback.textContent=t(error.message)}
+  finally{profileSaving=false;$('#profileAvatarFile').disabled=false;input.disabled=false;button.disabled=false;button.textContent=t('Save profile')}
+});
 function renderAccount(account){
   state.account=account;
+  const profileInput=$('#profileDisplayName');if(document.activeElement!==profileInput&&!profileSaving)profileInput.value=account?.displayName||'';profileInput.disabled=profileSaving||!account?.type;$('#saveProfile').disabled=profileInput.disabled;
   const displayName=account?.displayName?.trim()||t('Settings'),initials=account?.initials?.trim()||'?',type=account?.type||'unknown',plan=account?.planType?`${account.planType.charAt(0).toUpperCase()}${account.planType.slice(1)} plan`:type==='apiKey'?t('API key mode'):type==='amazonBedrock'?'Amazon Bedrock':'';
   const profileMenuAvailable=type==='chatgpt';
   $('#accountName').textContent=displayName;$('#accountMenuName').textContent=displayName;$('#settingsAccountName').textContent=displayName;$('#accountFooterMeta').textContent='';$('#accountMenuSubtitle').textContent=plan;$('#settingsAccountMeta').textContent=plan||t('Codex account');

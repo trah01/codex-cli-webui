@@ -4,6 +4,15 @@ export const LOCALE_PREFERENCES = Object.freeze(["system", "zh-CN", "en"]);
 const ZH_CN = Object.create(null);
 
 Object.assign(ZH_CN, {
+  "Avatar": "头像",
+  "Use a PNG, JPEG, WebP or GIF image up to 2 MB.": "请选择不超过 2 MB 的 PNG、JPEG、WebP 或 GIF 图片。",
+  "Could not read image. Choose another image.": "无法读取图片，请重新选择。",
+  "Display name": "显示名称",
+  "Save profile": "保存资料",
+  "Saving profile…": "正在保存…",
+  "Profile saved.": "资料已保存",
+  "Could not save profile. Try again.": "资料保存失败，请重试。",
+  "Display name must contain 1–160 characters without control characters.": "显示名称应为 1–160 个字符，不能包含换行等控制字符。",
   "Choose an answer": "请选择",
   "Other answer": "其他答案",
   "Enter your answer": "填写你的答案",

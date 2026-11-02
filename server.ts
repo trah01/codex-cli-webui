@@ -44,11 +44,14 @@ import {
   toPublicAccountIdentity,
 } from "./profile-service.js";
 
+import { saveProfileName, validateProfileName, validateProfileAvatar, readProfileAvatar, withProfileName } from "./profile-store.js";
+
 const host = process.env.HOST || "127.0.0.1";
 const port = Number(process.env.PORT || 8899);
 const accessToken = process.env.CODEX_WEBUI_ACCESS_TOKEN || null;
 const environmentPassword = process.env.CODEX_WEBUI_PASSWORD || null;
 const managedPasswordPath = passwordStorePath();
+const profileStorePath = `${managedPasswordPath}.profile.json`;
 const domainStorePath = `${managedPasswordPath}.access.json`;
 let boundDomain = loadBoundDomain(domainStorePath);
 let managedPassword: StoredPassword | null = environmentPassword || accessToken ? null : loadStoredPassword(managedPasswordPath);
@@ -666,11 +669,38 @@ const server = createServer(async (req, res) => {
       res.end(JSON.stringify({ error: "Account identity is available only on localhost" }));
       return;
     }
+    const editing = url.pathname === "/api/account" && req.method === "POST";
+    if (req.method !== "GET" && !editing) {
+      sendAuthError(res, 405, "Method not allowed", { allow: url.pathname === "/api/account" ? "GET, POST" : "GET" });
+      return;
+    }
+    let displayName: string | undefined, uploadedAvatar: string | undefined;
+    if (editing) {
+      if (!isSameOrigin(req.headers.origin, req.headers.host)) {
+        sendAuthError(res, 403, "Request origin does not match the access domain");
+        return;
+      }
+      try {
+        const payload = await readJsonBody(req, 2_810_000);
+        displayName = validateProfileName(payload.displayName);
+        if (payload.avatar !== undefined) { validateProfileAvatar(payload.avatar); uploadedAvatar = payload.avatar; }
+      }
+      catch (error) { sendAuthError(res, 400, error instanceof Error ? error.message : "Invalid profile"); return; }
+    }
     try {
+      if (url.pathname === "/api/account/avatar") {
+        const uploaded = await readProfileAvatar(profileStorePath);
+        if (uploaded) {
+          res.writeHead(200, { "content-type": uploaded.contentType, "content-length": String(uploaded.body.length), "cache-control": "no-store", "x-content-type-options": "nosniff", "cross-origin-resource-policy": "same-origin" });
+          res.end(uploaded.body);
+          return;
+        }
+      }
       const account = await accountLoader.get(url.searchParams.get("refresh") === "1");
+      if (editing) await saveProfileName(profileStorePath, displayName, uploadedAvatar);
       if (url.pathname === "/api/account") {
         res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" });
-        res.end(JSON.stringify(toPublicAccountIdentity(account)));
+        res.end(JSON.stringify(await withProfileName(toPublicAccountIdentity(account), profileStorePath)));
         return;
       }
       if (!account.imageUrl) {
@@ -688,6 +718,10 @@ const server = createServer(async (req, res) => {
       res.end(avatar.body);
     } catch (error) {
       console.warn("[codex-webui] account request failed:", error instanceof Error ? error.message : String(error));
+      if (editing) {
+        sendAuthError(res, 500, "Could not save profile. Try again.");
+        return;
+      }
       if (url.pathname === "/api/account/avatar") {
         res.writeHead(502, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
         res.end(JSON.stringify({ error: "Profile avatar unavailable" }));
