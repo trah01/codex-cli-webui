@@ -35,6 +35,8 @@ test('OTP requires a password and OIDC requires HTTPS and a bound callback domai
 test('management rejects domains, LAN, IPv6, cross-origin and forwarded loopback requests', () => {
   const request = (address, host, extra = {}) => ({ socket: { remoteAddress: address }, headers: { host, ...extra } });
   expect(isLocalAuthManagementRequest(request('127.0.0.1', '127.0.0.1:8899'))).toBe(true);
+  expect(isLocalAuthManagementRequest(request('127.0.0.1', 'localhost:8899'))).toBe(true);
+  expect(isLocalAuthManagementRequest(request('::1', 'localhost:8899'))).toBe(true);
   for (const req of [request('192.168.1.2', '127.0.0.1:8899'), request('::1', '[::1]:8899'), request('127.0.0.1', 'codex.example.com'), request('127.0.0.1', '127.0.0.1:8899', { 'x-forwarded-for': '127.0.0.1' }), request('127.0.0.1', '127.0.0.1:8899', { origin: 'https://evil.example.com' })]) expect(isLocalAuthManagementRequest(req)).toBe(false);
 });
 
@@ -55,7 +57,8 @@ test('web form generates enrollment material and clears secrets after saving', a
     await generate.onclick();
     expect(form.querySelector('[name="otpSecret"]').value).toBe('A'.repeat(32));
     form.querySelector('[name="otpCode"]').value = '123456';
-    await form.onsubmit({ preventDefault() {} });
+    form.querySelector('[name="otpCode"]').dispatchEvent(new dom.window.FocusEvent('focusout', { bubbles: true }));
+    await vi.waitFor(() => expect(form.querySelector('[name="otpSecret"]').value).toBe(''));
     const sent = JSON.parse(calls.at(-1).options.body);
     expect(sent.otpEnabled).toBe(true); expect(sent.otpCode).toBe('123456');
     expect(form.querySelector('[name="otpSecret"]').value).toBe('');
@@ -75,7 +78,7 @@ test('saving one settings page preserves other authentication groups', () => {
   expect(() => updateAuthenticationSettings(previous, { scope: 'unknown' })).toThrow();
 });
 
-test('each authentication page renders only its own fields and save action', async () => {
+test('each authentication page renders only its own fields', async () => {
   const { JSDOM } = await import('jsdom'); const { vi } = await import('vitest');
   const { renderAuthenticationSettings } = await import('../public/authentication-settings.js');
   const { renderAccessSettings } = await import('../public/access-settings.js');
@@ -86,7 +89,6 @@ test('each authentication page renders only its own fields and save action', asy
     for (const [scope, names] of [['otp', ['otpEnabled', 'otpSecret', 'otpCode']], ['oidc', ['mode', 'issuer', 'clientId', 'clientSecret', 'redirectUri']]]) {
       root.replaceChildren(); await renderAuthenticationSettings(root, scope);
       expect([...root.querySelectorAll('[name]')].map(input => input.name)).toEqual(names);
-      expect(root.querySelectorAll('button[type="submit"]')).toHaveLength(1);
       if (scope === 'oidc') {
         expect(root.querySelector('[name="redirectUri"]').readOnly).toBe(true);
         expect(root.querySelector('[name="subjects"]')).toBeNull();

@@ -13,9 +13,9 @@ export function normalizeBoundDomain(value) {
   return domain;
 }
 
-export function loadBoundDomain(path) {
+export function loadBoundDomain(path, env = process.env) {
   try { return normalizeBoundDomain(JSON.parse(readFileSync(path, 'utf8')).domain); }
-  catch (error) { if (error.code === 'ENOENT') return ''; throw error; }
+  catch (error) { if (error.code === 'ENOENT') return normalizeBoundDomain(env.CODEX_WEBUI_DOMAIN || ''); throw error; }
 }
 
 export function saveBoundDomain(path, domain) {

@@ -70,3 +70,18 @@ test('cross-site OIDC returns can reach loopback pages without gaining settings 
   expect(isLocalAuthManagementRequest(foreignOrigin)).toBe(false);
   expect(boundDomainRequest(request('127.0.0.1:8899', { 'x-forwarded-for': '192.168.1.2', 'sec-fetch-site': 'cross-site' }, '127.0.0.1'), domain)).toBeNull();
 });
+
+test('environment domain enables initial remote access while saved choices retain precedence', () => {
+  const root = mkdtempSync(join(tmpdir(), 'webui-environment-domain-'));
+  const path = join(root, 'access.json');
+  const env = { CODEX_WEBUI_DOMAIN: 'initial.example.com' };
+  try {
+    expect(loadBoundDomain(path, env)).toBe('initial.example.com');
+    expect(boundDomainRequest(request('initial.example.com'), loadBoundDomain(path, env))).not.toBeNull();
+    expect(() => loadBoundDomain(path, { CODEX_WEBUI_DOMAIN: 'https://bad.example.com' })).toThrow();
+    saveBoundDomain(path, 'saved.example.com');
+    expect(loadBoundDomain(path, env)).toBe('saved.example.com');
+    saveBoundDomain(path, '');
+    expect(loadBoundDomain(path, env)).toBe('');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

@@ -41,7 +41,7 @@ import {
   unauthorizedResponse,
   verifyStoredPassword,
 } from "./server-security.js";
-import { loadStoredPassword, passwordStorePath, saveStoredPassword, replaceStoredPassword, type StoredPassword } from "./password-store.js";
+import { readEnvironmentCredentials, loadStoredPassword, passwordStorePath, saveStoredPassword, replaceStoredPassword, type StoredPassword } from "./password-store.js";
 import { boundDomainRequest, loadBoundDomain, normalizeBoundDomain, saveBoundDomain } from "./access-policy.js";
 import { validateImageInputs, TURN_REQUEST_MAX_BYTES } from "../public/composer-input.js";
 import { interruptThread } from "./turn-control.js";
@@ -62,7 +62,7 @@ const readAbout = createAboutService({ version: appVersion, projectUrl: packageM
 const host = process.env.HOST || "127.0.0.1";
 const port = Number(process.env.PORT || 8899);
 const accessToken = process.env.CODEX_WEBUI_ACCESS_TOKEN || null;
-const environmentPassword = process.env.CODEX_WEBUI_PASSWORD || null;
+const { password: environmentPassword, username: environmentUsername } = readEnvironmentCredentials();
 const managedPasswordPath = passwordStorePath();
 const passkeys = createPasskeyService({ path: `${managedPasswordPath}.passkeys.json` });
 const profileStorePath = `${managedPasswordPath}.profile.json`;
@@ -422,7 +422,7 @@ function requestMatchesSecret(req: IncomingMessage, submittedPassword: string, e
 }
 
 function validBrowserPassword(req: IncomingMessage, submittedPassword: string, username?: string) {
-  if (environmentPassword) return requestMatchesSecret(req, submittedPassword, environmentPassword);
+  if (environmentPassword) return (!environmentUsername || username === environmentUsername) && requestMatchesSecret(req, submittedPassword, environmentPassword);
   if (managedPassword) {
     if (managedPassword.username && username !== managedPassword.username) return false;
     if (!requestMatchesSecret(req, submittedPassword, submittedPassword)) return false;
@@ -480,6 +480,7 @@ function encodeContentDispositionFilename(filename: string) {
 
 const mime: Record<string, string> = {
   ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
+  ".webmanifest": "application/manifest+json; charset=utf-8",
   ".json": "application/json; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon",
 };
 
@@ -511,7 +512,7 @@ const server = createServer(async (req, res) => {
     return;
   }
   const appRoute = req.method === "GET" && (url.pathname === "/" || /^\/settings(?:\/[^/]+)?\/?$/.test(url.pathname));
-  const loginAssets = new Set(["/", "/index.html", "/style.css", "/favicon.svg", "/auth-bootstrap.js", "/passkey-client.js", "/i18n.js", "/codex-brand.js"]);
+  const loginAssets = new Set(["/", "/index.html", "/style.css", "/favicon.svg", "/manifest.webmanifest", "/install-app.js", "/service-worker.js", "/assets/app-icon-192.png", "/assets/app-icon-512.png", "/auth-bootstrap.js", "/passkey-client.js", "/i18n.js", "/codex-brand.js"]);
   if (url.pathname === "/api/auth/status") {
     const authenticated = authorizedRequest(req);
     const passkeyContext = passkeyRequestContext(req, { domain: boundDomain, publicOrigin });
@@ -529,7 +530,7 @@ const server = createServer(async (req, res) => {
       passkeyOrigin: passkeyContext?.origin || null,
       canManagePasskeys: isLocalAuthManagementRequest(req),
       canManageCredentials: canManageAuthentication(req),
-      usernameRequired: Boolean(managedPassword?.username),
+      usernameRequired: Boolean(environmentUsername || managedPassword?.username),
     }));
     return;
   }
@@ -604,7 +605,7 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === "GET" && url.pathname === "/api/auth/credentials") {
       res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
-      res.end(JSON.stringify({ configured: browserPasswordConfigured(), username: managedPassword?.username || "codex", localAuthRequired: securitySettings.localAuthRequired, editable: !environmentPassword && !accessToken }));
+      res.end(JSON.stringify({ configured: browserPasswordConfigured(), username: environmentUsername || managedPassword?.username || "codex", localAuthRequired: securitySettings.localAuthRequired, editable: !environmentPassword && !accessToken }));
       return;
     }
     if (req.method !== "POST") {
@@ -1140,9 +1141,10 @@ await build({
 
 startCodex();
 server.listen(port, host, () => {
-  console.log(`codex-cli-webui listening on http://${host}:${port}`);
+  const displayHost = localhostOnly ? "localhost" : host.includes(":") ? `[${host}]` : host;
+  console.log(`codex-cli-webui listening on http://${displayHost}:${port}`);
   console.log(`[codex-cli-webui] Codex connection: ${codexConnection.kind}`);
-  if (passwordSetupRequired()) console.warn(`[codex-cli-webui] Configure public access credentials at http://127.0.0.1:${port}/settings/access-settings`);
+  if (passwordSetupRequired()) console.warn(`[codex-cli-webui] 请在服务器本机通过 http://localhost:${port}/settings/access-settings 配置登录信息，也可通过端口转发或环境变量完成配置`);
   if (!localhostOnly) {
     const addresses = Object.values(networkInterfaces()).flat().filter((entry): entry is NonNullable<typeof entry> => !!entry && entry.family === "IPv4" && !entry.internal);
     for (const entry of addresses) console.log(`LAN: http://${entry.address}:${port} (authentication required)`);

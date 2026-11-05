@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createStoredPassword } from "../server/server-security.js";
-import { loadStoredPassword, passwordStorePath, saveStoredPassword, replaceStoredPassword } from "../server/password-store.js";
+import { readEnvironmentCredentials, loadStoredPassword, passwordStorePath, saveStoredPassword, replaceStoredPassword } from "../server/password-store.js";
 
 describe("managed LAN password store", () => {
   test("atomically replaces credentials without storing plaintext", () => {
@@ -50,4 +50,11 @@ describe("managed LAN password store", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+});
+
+test("environment credentials support an optional username without weakening password-only compatibility", () => {
+  expect(readEnvironmentCredentials({ CODEX_WEBUI_PASSWORD: 'example password' })).toEqual({ password: 'example password', username: null });
+  expect(readEnvironmentCredentials({ CODEX_WEBUI_USERNAME: 'admin', CODEX_WEBUI_PASSWORD: 'example password' })).toEqual({ password: 'example password', username: 'admin' });
+  expect(() => readEnvironmentCredentials({ CODEX_WEBUI_USERNAME: 'admin' })).toThrow();
+  expect(() => readEnvironmentCredentials({ CODEX_WEBUI_USERNAME: 'invalid/user', CODEX_WEBUI_PASSWORD: 'example password' })).toThrow();
 });

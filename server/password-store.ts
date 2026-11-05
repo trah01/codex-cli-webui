@@ -12,6 +12,15 @@ export type StoredPassword = {
   username?: string;
 };
 
+export function readEnvironmentCredentials(env: NodeJS.ProcessEnv = process.env) {
+  const password = env.CODEX_WEBUI_PASSWORD || null;
+  const username = env.CODEX_WEBUI_USERNAME?.trim() || null;
+  if (username && (!password || !/^[a-zA-Z0-9_.-]{1,64}$/.test(username))) {
+    throw new Error('CODEX_WEBUI_USERNAME 需与 CODEX_WEBUI_PASSWORD 一起配置，且为 1–64 位字母、数字、点、下划线或连字符。');
+  }
+  return { password, username };
+}
+
 export function passwordStorePath(env: NodeJS.ProcessEnv = process.env) {
   if (env.CODEX_WEBUI_AUTH_STORE) return resolve(env.CODEX_WEBUI_AUTH_STORE);
   const codexHome = env.CODEX_HOME || join(homedir(), ".codex");

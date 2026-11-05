@@ -28,11 +28,11 @@ export async function renderAuthenticationSettings(container, scope = 'otp') {
   if (!settings.issuer) mode.value = 'oidc';
   }
   let otp, secret, generate, enrollment, code;
+  const enrollmentHint = '在验证器中手动添加密钥，选择 SHA1、6 位数字、30 秒，然后填写验证码，离开输入区域后自动生效。';
   if (scope === 'otp') {
   otp = field('otpEnabled', '密码登录二次验证', 'text', [['false', '关闭'], ['true', '开启动态验证码']]); otp.value = String(settings.otpEnabled);
   secret = field('otpSecret', '验证器密钥', 'password'); secret.placeholder = settings.otpEnabled ? '已配置，留空保持不变' : '生成新密钥或填写已有密钥';
   generate = document.createElement('button'); generate.type = 'button'; generate.className = 'integration-refresh'; generate.textContent = '生成新密钥';
-  const enrollmentHint = '在验证器中手动添加密钥，选择 SHA1、6 位数字、30 秒，然后填写验证码，离开输入区域后自动生效。';
   enrollment = document.createElement('p'); enrollment.className = 'settings-feedback settings-enrollment'; enrollment.textContent = enrollmentHint;
   form.append(generate, enrollment);
   code = field('otpCode', '验证器当前验证码'); code.inputMode = 'numeric'; code.maxLength = 6; code.pattern = '[0-9]{6}'; code.autocomplete = 'one-time-code';
@@ -57,7 +57,7 @@ export async function renderAuthenticationSettings(container, scope = 'otp') {
   copy.onclick = async () => { try { await navigator.clipboard.writeText(callback.value); feedback.textContent = '回调地址已复制。'; } catch { callback.select(); feedback.textContent = '请复制已选中的回调地址。'; } };
   form.append(copy);
   }
-  const note = document.createElement('p'); note.className = 'settings-feedback'; note.textContent = '仅服务器本机 127.0.0.1 可配置。OIDC 的二次验证请在身份提供方开启；本机仍可使用已配置的密码维护设置。';
+  const note = document.createElement('p'); note.className = 'settings-feedback'; note.textContent = '仅服务器本机通过 localhost 或 127.0.0.1 可配置。OIDC 的二次验证请在身份提供方开启；本机仍可使用已配置的密码维护设置。';
   const actions = document.createElement('div'); actions.className = 'settings-actions'; actions.append(feedback); form.append(note, actions); container.append(form);
   return [bindSettingsAutosave(form, { feedback, t: value => value === 'Saving…' ? '正在保存…' : value, ready: () => {
     if (otp?.value === 'true' && (!settings.otpEnabled || secret.value) && !/^[0-9]{6}$/.test(code.value)) {

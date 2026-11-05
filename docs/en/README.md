@@ -55,9 +55,9 @@ npm ci
 npm start
 ```
 
-Open **http://127.0.0.1:8899**. The default listener is `127.0.0.1:8899`.
+Open **http://localhost:8899**. The default listener is `127.0.0.1:8899`.
 
-Complete initial credential setup through the server's local browser, then select a project directory. Credential configuration requires direct access using `127.0.0.1` or `localhost`. IPv6 address literals, other IP addresses, domains, and forwarded requests cannot manage local credentials. Passkeys can be managed after login on either localhost or a controlled HTTPS domain.
+Complete initial credential setup through the server's local browser, then select a project directory. Credential configuration requires direct access using `127.0.0.1` or `localhost`. IPv6 address literals, other IP addresses, domains, and forwarded requests cannot manage local credentials. Passkeys can only be managed locally after login through localhost. Remote HTTPS access supports sign-in with an existing credential for that domain; management is unavailable.
 
 ## Settings and authentication
 
@@ -67,7 +67,7 @@ Local security pages provide:
 
 - **Credentials:** passwords must contain 12–256 characters. Changing credentials invalidates existing sessions. Local login is enabled by default.
 - **Domain binding:** validates the hostname used by a controlled entry point. It does not configure DNS, certificates, or network restrictions, and does not authorize public exposure.
-- **Passkeys:** open Settings → Security → Passkeys after signing in. Use `http://localhost:8899` locally or HTTPS remotely; enroll separately for each hostname. Enrollment and removal require identity verification within the last five minutes. Device fingerprint, face, PIN, or a security key replaces password and OTP entry for Passkey login. Existing password and OIDC methods remain available. Public keys are stored in `.passkeys.json` next to the authentication store; private keys stay with the authenticator. Removing a key signs out other sessions.
+- **Passkeys:** open Settings → Security → Passkeys after signing in. Manage credentials through `http://localhost:8899` on the server. Remote HTTPS access only supports sign-in with existing credentials for that domain; localhost credentials cannot be used on a remote hostname. Enrollment and removal require identity verification within the last five minutes. Device fingerprint, face, PIN, or a security key replaces password and OTP entry for Passkey login. Existing password and OIDC methods remain available. Public keys are stored in `.passkeys.json` next to the authentication store; private keys stay with the authenticator. Removing a key signs out other sessions.
 - **OTP:** authenticator-based codes for password login; enrollment requires a current code.
 - **OIDC:** bind the controlled entry domain, register the displayed callback with your identity provider, and enter client settings. Restrict provider access to trusted people: this application has no separate user allowlist. Enforce OIDC MFA at the identity provider.
 

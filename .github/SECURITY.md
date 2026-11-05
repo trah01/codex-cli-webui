@@ -1,27 +1,18 @@
-# Security Policy
+# 安全政策
 
-## Supported version
+## 漏洞报告
 
-Security fixes are applied to the latest version on the `main` branch.
+安全修复以 `main` 分支的最新版本为准。发现漏洞时，请通过本项目 GitHub 仓库的私密漏洞报告功能联系维护者；若该功能尚未开启，请勿在公开 Issue 中发布可利用细节、凭据或敏感数据。报告应包含受影响版本、复现步骤、影响范围及已知的缓解办法。
 
-## Reporting a vulnerability
+## 使用边界
 
-Do not publish exploitable details in a public issue. Use GitHub's private vulnerability reporting feature for this repository and include the affected version, reproduction steps, impact, and suggested mitigation if known.
+本项目通过 Codex 执行命令、读写文件和操作终端，是共享服务器工作环境的开发工具，不提供多租户隔离。只允许可信人员访问。
 
-## Security model
-
-codex-cli-webui runs commands and edits files through the local Codex app-server. Treat it as a local developer tool, not as a hardened multi-tenant service.
-
-- Do not expose the WebUI directly to the public Internet, even with authentication or HTTPS. For remote access, use a bastion security gateway as a reverse proxy and restrict backend connections to that gateway. See the [deployment guide](../docs/guides/部署与访问.md).
-- The default listener is `127.0.0.1`. All execution APIs, terminal connections, event streams and WebSocket bridges require login, including loopback. Initial credential setup is restricted to direct 127.0.0.1 or localhost access; subsequent credential/domain changes also require an authenticated session.
-- Managed passwords use salted `scrypt`. Optional TOTP protects remote password login. Direct 127.0.0.1 access uses password-only login by default; local login can be disabled in local settings without bypassing remote authentication. OIDC uses PKCE, state, nonce and signed ID Token validation. Any user authenticated by the configured provider can access the same Codex instance; manage login eligibility and MFA at the identity provider.
-- Sessions are random, stored server-side, expire after eight hours, and are revoked on logout, credential rotation or restart. Cookies are HttpOnly and SameSite=Strict; an HTTPS public origin or OIDC enables Secure cookies. Configure TLS and restrict the backend network.
-- Explicit Bearer machine credentials are available only in password mode without OTP. Basic authentication and passwords cannot directly authorize API requests. Login attempts are rate limited by TCP peer and globally.
-- Browser WebSocket RPC is allowlisted and cannot invoke app-server filesystem, configuration, or account methods.
-- Static files are allowlisted, canonicalized, and symbolic links are never served.
-- Folder browsing canonicalizes paths and rejects symbolic links that escape the user's home directory.
-- Review Undo/Reapply accepts only server-owned app-server diff notifications. Client-supplied `cwd` and diff data, symbolic-link patches, `.git`, `.env`, and `node_modules` targets are rejected.
-- Review approval prompts before allowing commands or file changes.
-- Secrets must never be committed, included in screenshots, or pasted into Issues.
-
-Passkeys use WebAuthn with required device user verification, one-use browser-bound challenges, exact origin and RP ID checks, and signature-counter updates. Registration and removal require a recently verified browser session. Local passkeys use localhost; remote passkeys require HTTPS and are scoped to the configured domain. Private keys are never stored on the server.
+- 默认监听 `127.0.0.1`。远程访问应通过堡垒机安全网关，并限制后端仅接受网关连接；密码和 HTTPS 不能替代网络隔离。部署方法见 [部署与访问](../docs/guides/部署与访问.md)。
+- 账号、域名和认证配置仅允许服务器本机直接访问时管理。通行密钥的添加、查看和删除也仅限本机，远程只能使用当前域名已有的密钥登录。
+- 通行密钥使用 WebAuthn，校验设备身份、一次性挑战、来源地址、站点标识与签名计数。管理操作要求最近五分钟内验证过身份；服务器只保存公钥与元数据，不保存私钥。
+- 密码采用加盐 `scrypt` 校验。远程密码登录可启用动态验证码；统一身份登录校验 PKCE、state、nonce 和签名身份令牌。身份提供方应自行限制可登录人员并配置二次验证。
+- 浏览器会话保存在服务器，默认八小时过期；退出登录、变更凭据或重启会使相关会话失效。会话 Cookie 使用 HttpOnly 和 SameSite=Strict，HTTPS 场景使用 Secure。
+- 浏览器接口和静态资源采用允许列表；文件访问检查路径与符号链接。代码审查的撤销和重新应用只接受服务器记录的差异，不接受客户端提交的目录或补丁。
+- 服务进程应使用专用普通用户，并仅获得必要的目录权限。执行命令或修改文件前，应检查审批内容，谨慎启用完全访问权限。
+- 不要将密码、令牌、私钥、会话 Cookie 或业务数据写入提交、截图和公开 Issue。会话、草稿、附件及认证存储应按敏感数据保护和备份。
