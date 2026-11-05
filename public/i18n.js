@@ -4,6 +4,7 @@ export const LOCALE_PREFERENCES = Object.freeze(["system", "zh-CN", "en"]);
 const ZH_CN = Object.create(null);
 
 Object.assign(ZH_CN, {
+  "Answer queued": "回答已加入发送队列",
   "Avatar": "头像",
   "Use a PNG, JPEG, WebP or GIF image up to 2 MB.": "请选择不超过 2 MB 的 PNG、JPEG、WebP 或 GIF 图片。",
   "Could not read image. Choose another image.": "无法读取图片，请重新选择。",
@@ -13,6 +14,10 @@ Object.assign(ZH_CN, {
   "Profile saved.": "资料已保存",
   "Could not save profile. Try again.": "资料保存失败，请重试。",
   "Display name must contain 1–160 characters without control characters.": "显示名称应为 1–160 个字符，不能包含换行等控制字符。",
+  "Answer received": "已接收",
+  "Request ended": "已结束",
+  "Waiting for the original request": "等待原请求恢复",
+  "Draft changed in another window. Your current input has been kept.": "其他窗口修改了草稿，当前输入已保留。",
   "Choose an answer": "请选择",
   "Other answer": "其他答案",
   "Enter your answer": "填写你的答案",
@@ -34,6 +39,7 @@ Object.assign(ZH_CN, {
   "Username": "账号",
   "Attach images": "添加图片",
   "Remove image": "移除图片",
+  "View image": "查看图片",
   "Use PNG, JPEG, WebP or GIF images": "请选择 PNG、JPEG、WebP 或 GIF 图片",
   "Each image must be 10 MB or smaller": "每张图片不能超过 10 MB",
   "Attach up to 10 images, 20 MB in total": "最多添加 10 张图片，总大小不能超过 20 MB",
@@ -77,7 +83,6 @@ Object.assign(ZH_CN, {
   "Open browser panel": "打开浏览器面板",
   "Load more": "加载更多",
   "Restore": "恢复",
-  "No archived chats": "没有已归档的对话",
   "Refresh": "刷新",
   "Loading…": "正在读取…",
   "Enabled": "已启用",
@@ -217,8 +222,6 @@ Object.assign(ZH_CN, {
   "Personal": "个人",
   "Integrations": "集成",
   "Coding": "编程",
-  "Archived": "已归档",
-  "Archived chats": "已归档的对话",
   "Plugins": "插件",
   "Skills": "技能",
   "Connections": "连接",
@@ -324,6 +327,7 @@ Object.assign(ZH_CN, {
 Object.assign(ZH_CN, {
   "Working": "正在处理",
   "Completed": "已完成",
+  "In progress": "执行中",
   "Tool failed": "工具调用失败",
   "Thinking": "思考中",
   "Thought": "已思考",

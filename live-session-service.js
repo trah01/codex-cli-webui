@@ -51,18 +51,18 @@ function outputDetails(raw) {
   return { output, exitCode, running, failed };
 }
 
-function messageItem(payload) {
+function messageItem(payload, fallbackId) {
   if (payload?.type !== "message" || payload.role !== "assistant") return null;
   const text = contentText(payload.content);
   if (!text) return null;
-  return { id: payload.id || `host-message-${Date.now()}`, type: "agentMessage", text, phase: payload.phase || "final_answer" };
+  return { id: payload.id || fallbackId, type: "agentMessage", text, phase: payload.phase || "final_answer", ...(Array.isArray(payload.questions) && { questions: payload.questions }) };
 }
 
-function reasoningItem(payload) {
+function reasoningItem(payload, fallbackId) {
   if (payload?.type !== "reasoning") return null;
   const summary = contentText(payload.summary);
   if (!summary) return null;
-  return { id: payload.id || `host-reasoning-${Date.now()}`, type: "reasoning", summary: [summary], status: "completed" };
+  return { id: payload.id || fallbackId, type: "reasoning", summary: [summary], status: "completed" };
 }
 
 function newState() {
@@ -73,6 +73,7 @@ function newState() {
     commandCalls: new Map(),
     activeCommandId: null,
     userSequence: 0,
+    itemSequence: 0,
     patchSequence: 0,
     lastEventAt: null,
   };
@@ -170,9 +171,10 @@ export function applyRolloutEvent(state, event) {
     return state;
   }
   if (event.type !== "response_item") return state;
-  const message = messageItem(payload);
+  const sequence = ++state.itemSequence;
+  const message = messageItem(payload, `host-message-${state.turn.id}-${sequence}`);
   if (message) { upsertItem(state, message); return state; }
-  const reasoning = reasoningItem(payload);
+  const reasoning = reasoningItem(payload, `host-reasoning-${state.turn.id}-${sequence}`);
   if (reasoning) { upsertItem(state, reasoning); return state; }
   if (payload.type === "custom_tool_call") {
     const command = commandFromToolInput(payload.input);

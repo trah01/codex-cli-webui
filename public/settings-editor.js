@@ -114,27 +114,6 @@ export function createSettingsEditor(context) {
     for (const error of result.marketplaceLoadErrors || []) text(container, error.message);
     if (!count) text(container, 'No installed plugins found');
   }
-  async function archived(container, current) {
-    let cursor = null;
-    const list = document.createElement('div'); container.append(list);
-    const more = button(container, 'Load more', load);
-    async function load() {
-      const result = await rpc('thread/list', { archived: true, limit: 30, ...(cursor ? { cursor } : {}) });
-      if (current !== generation) return;
-      for (const thread of result.data || []) {
-        const actions = document.createElement('span');
-        const item = row(list, thread.name || thread.preview || 'Untitled task', actions);
-        button(actions, 'Restore', async () => {
-          await rpc('thread/unarchive', { threadId: thread.id }); item.remove(); context.refreshThreads();
-          if (!list.childElementCount && !cursor) text(list, 'No archived chats');
-        });
-      }
-      cursor = result.nextCursor; more.hidden = !cursor;
-      if (!list.childElementCount) text(list, 'No archived chats');
-    }
-    more.disabled = true;
-    try { await load(); } finally { more.disabled = false; }
-  }
   async function render(page, container) {
     const current = ++generation; container.replaceChildren();
     try {
@@ -143,7 +122,6 @@ export function createSettingsEditor(context) {
       else if (page === 'global-instructions') await globalInstructions(container, current);
       else if (page === 'code-review') review(container);
       else if (page === 'plugins-settings') await plugins(container, current);
-      else if (page === 'data-controls') await archived(container, current);
       else if (page === 'browser-use') {
         button(container, 'Open browser panel', () => { context.closeSettings(); context.openBrowser(); });
       }

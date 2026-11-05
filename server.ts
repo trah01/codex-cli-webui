@@ -1,3 +1,7 @@
+import { mergeTurnSources } from './session-items.js';
+import { createSessionRequestHandlers } from './session-request-service.js';
+import { SessionService } from './session-service.js';
+import { PendingRequests } from './pending-requests.js';
 import { createReadStream, existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
@@ -82,6 +86,13 @@ const terminalSessions = new Map<WebSocket, ReturnType<typeof createTerminalSess
 const pending = new Map<number, { resolve: (value: any) => void; reject: (error: Error) => void }>();
 const reviewDiffs = new ReviewDiffStore();
 const liveSessions = new LiveSessionStore();
+const sessionService = new SessionService({
+  directory: `${managedPasswordPath}.sessions`, loadThread: loadSessionThread,
+  loadQueue: id => messageQueue.list(id), loadRequests: id => pendingRequests.listStates(id),
+});
+const pendingRequests = new PendingRequests({ path: `${managedPasswordPath}.requests.json`, onChange: (id, requests) => sessionService.publish(id, { requests }) });
+const { answer: answerBrowserRequest, saveDraft: saveSessionDraft } = createSessionRequestHandlers({ requests: pendingRequests, sessions: sessionService, send: sendRaw, enqueue: params => messageQueue.enqueue(params) });
+const eventChannels = new Map<string, { send: (message: any) => void }>();
 const settingsService = createSettingsService(request, { codexHome: () => resolve(codexSessionsRoot, "..") });
 const threadPaths = new Map<string, string>();
 let codexSessionsRoot = resolve(process.env.CODEX_HOME || resolve(homeDir, ".codex"), "sessions");
@@ -111,6 +122,7 @@ const codexConnection = createCodexConnection({
   },
   onDisconnect: ({ code, signal }: { code?: number | null; signal?: string | null }) => {
     connected = false;
+    pendingRequests.disconnect();
     accountLoader.invalidate(); reviewDiffs.clear();
     broadcast({ type: "bridge/status", status: "disconnected", code, signal });
     for (const item of pending.values()) item.reject(new Error("Codex connection closed"));
@@ -176,10 +188,12 @@ function handleCodex(message: any) {
     }
   }
   if (message.id !== undefined && message.method) {
+    pendingRequests.add(message);
     broadcast({ type: "codex/request", payload: message });
     return;
   }
   if (message.method) {
+    if (message.method === "serverRequest/resolved") pendingRequests.resolve(message.params?.requestId, message.params?.threadId);
     if (message.method === "account/updated") accountLoader.invalidate();
     if (message.method === "turn/diff/updated") reviewDiffs.record(message.params || {});
     if (message.method === "item/fileChange/patchUpdated") recordFileChangeDiff(message.params || {});
@@ -187,6 +201,7 @@ function handleCodex(message: any) {
       recordFileChangeDiff({ ...message.params, changes: message.params.item.changes });
     }
     if (message.method === "turn/completed") {
+      pendingRequests.endTurn(message.params?.threadId, message.params?.turn?.id);
       notifyNtfyTurnCompleted(message.params || {});
       messageQueue.wake();
     }
@@ -250,13 +265,41 @@ async function readLiveThread(threadId: unknown) {
   return liveSessions.read(safePath);
 }
 
+async function loadSessionThread(threadId: string) {
+  const result = await request("thread/read", { threadId, includeTurns: true });
+  recordThreadPathsFromRpc(result);
+  recordReviewDiffsFromRpc("thread/read", { threadId }, result);
+  const thread = result.thread;
+  try {
+    const live = await readLiveThread(threadId);
+    // The runtime status wins over unfinished historical rollout records.
+    if (live.active && live.turn && thread.status?.type === "active") {
+      const index = (thread.turns || []).findIndex((turn: any) => turn.id === live.turn.id);
+      if (index < 0) (thread.turns ||= []).push(mergeTurnSources(null, live.turn));
+      else thread.turns[index] = mergeTurnSources(thread.turns[index], live.turn);
+    }
+  } catch { /* Native thread snapshots remain usable without a local rollout. */ }
+  pendingRequests.reconcile(threadId, thread.turns || []);
+  return thread;
+}
+
 function broadcast(data: any) {
+  if (data.type === "bridge/queue") { sessionService.publish(data.threadId, { queue: data.messages }); return; }
+  if (data.type === "bridge/message") {
+    sessionService.notification("item/completed", { threadId: data.threadId, turnId: data.turnId, item: data.item }); return;
+  }
+  if (data.type === "codex/request") return; // Requests are published as durable per-session state.
+  if (data.type === "codex/notification") {
+    const { method, params = {} } = data.payload;
+    const scoped = sessionService.notification(method, params);
+    if (scoped || method.startsWith("item/") || method.startsWith("turn/") || method === "serverRequest/resolved") return;
+  }
   const text = JSON.stringify(data);
   for (const client of clients) if (client.readyState === WebSocket.OPEN) client.send(text);
   for (const client of sseClients) if (!client.writableEnded) client.write(`data: ${text}\n\n`);
 }
 
-async function dispatchBrowserMessage(message: any) {
+async function dispatchBrowserMessage(message: any, channel: { send: (message: any) => void } | null = null) {
   const id = message?.id;
   if (message?.type === "rpc") {
     try {
@@ -265,6 +308,16 @@ async function dispatchBrowserMessage(message: any) {
       if (["turn/start", "turn/steer"].includes(message.method)) validateImageInputs(params.input || []);
       const result = ["host/settings/read", "host/settings/write", "host/skills/set-enabled", "host/mcp/set-enabled"].includes(message.method)
         ? await settingsService(message.method, params)
+        : message.method === "host/session/subscribe"
+        ? await sessionService.subscribe(channel, params, event => channel?.send(event))
+        : message.method === "host/session/drafts"
+        ? { drafts: sessionService.entry(params.threadId).state.drafts }
+        : message.method === "host/session/draft"
+        ? saveSessionDraft(params)
+        : message.method === "host/thread/requests"
+        ? { requests: pendingRequests.list(params.threadId) }
+        : message.method === "host/request/respond"
+        ? answerBrowserRequest(params)
         : message.method === "host/thread/send"
         ? messageQueue.enqueue(params)
         : message.method === "host/thread/queue/list"
@@ -287,20 +340,20 @@ async function dispatchBrowserMessage(message: any) {
   }
   if (message?.type === "codex/response") {
     if (!Number.isSafeInteger(message.requestId)) throw new Error("Invalid Codex request id");
-    sendRaw({ id: message.requestId, result: message.result });
+    answerBrowserRequest({ ...message, threadId: message.threadId || pendingRequests.requests.get(message.requestId)?.params?.threadId });
     return { type: "ack" };
   }
   if (message?.type === "codex/error") {
     if (!Number.isSafeInteger(message.requestId)) throw new Error("Invalid Codex request id");
-    sendRaw({ id: message.requestId, error: message.error });
+    answerBrowserRequest({ ...message, threadId: message.threadId || pendingRequests.requests.get(message.requestId)?.params?.threadId });
     return { type: "ack" };
   }
   if (message?.type === "ping") return { type: "pong" };
   throw new Error("Unsupported browser bridge message");
 }
 
-async function handleClient(client: WebSocket, message: any) {
-  try { client.send(JSON.stringify(await dispatchBrowserMessage(message))); }
+async function handleClient(client: WebSocket, message: any, channel: { send: (message: any) => void }) {
+  try { client.send(JSON.stringify(await dispatchBrowserMessage(message, channel))); }
   catch (error) { client.send(JSON.stringify(rpcErrorPayload(message?.id, error))); }
 }
 
@@ -550,8 +603,14 @@ const server = createServer(async (req, res) => {
     res.flushHeaders?.();
     res.write("retry: 1000\n\n");
     sseClients.add(res);
+    const clientId = url.searchParams.get("clientId") || "";
+    const channel = { send: (message: any) => { if (!res.writableEnded) res.write(`data: ${JSON.stringify(message)}\n\n`); } };
+    if (/^[a-zA-Z0-9_-]{16,128}$/.test(clientId)) {
+      const previous = eventChannels.get(clientId); if (previous) sessionService.disconnect(previous);
+      eventChannels.set(clientId, channel);
+    }
     res.write(`data: ${JSON.stringify({ type: "bridge/status", status: connected ? "connected" : "connecting" })}\n\n`);
-    req.on("close", () => sseClients.delete(res));
+    req.on("close", () => { sseClients.delete(res); sessionService.disconnect(channel); if (eventChannels.get(clientId) === channel) eventChannels.delete(clientId); });
     return;
   }
   if (url.pathname === "/api/rpc" || url.pathname === "/api/codex/respond") {
@@ -565,7 +624,7 @@ const server = createServer(async (req, res) => {
       const message = url.pathname === "/api/rpc"
         ? { type: "rpc", id: payload.id, method: payload.method, params: payload.params || {} }
         : { type: payload.error ? "codex/error" : "codex/response", requestId: payload.requestId, result: payload.result, error: payload.error };
-      const reply = await dispatchBrowserMessage(message);
+      const reply = await dispatchBrowserMessage(message, eventChannels.get(payload.clientId) || null);
       res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" });
       res.end(JSON.stringify(reply));
     } catch (error) {
@@ -845,12 +904,13 @@ server.on("upgrade", (req, socket, head) => {
 });
 wss.on("connection", (client) => {
   clients.add(client);
+  const channel = { send: (message: any) => { if (client.readyState === WebSocket.OPEN) client.send(JSON.stringify(message)); } };
   client.send(JSON.stringify({ type: "bridge/status", status: connected ? "connected" : "connecting" }));
   client.on("message", (raw) => {
-    try { handleClient(client, JSON.parse(String(raw))); }
+    try { handleClient(client, JSON.parse(String(raw)), channel); }
     catch (error) { client.send(JSON.stringify({ type: "rpc/error", error: String(error) })); }
   });
-  client.on("close", () => clients.delete(client));
+  client.on("close", () => { clients.delete(client); sessionService.disconnect(channel); });
 });
 terminalWss.on("connection", (client, req) => {
   let terminal: ReturnType<typeof createTerminalSession> | null = null;
@@ -918,6 +978,7 @@ function shutdown() {
   if (shuttingDown) return;
   shuttingDown = true;
   messageQueue.close();
+  sessionService.close();
   connected = false;
   if (restartTimer) clearTimeout(restartTimer);
   restartTimer = null;

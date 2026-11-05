@@ -73,12 +73,6 @@
           <span class="account-avatar account-initials" id="accountAvatar">?</span>
           <span class="account-button-copy"><strong id="accountName">Settings</strong><small id="accountFooterMeta" aria-hidden="true"></small></span>
         </button>
-        <button class="sidebar-help-button" id="sidebarHelpButton" type="button" title="Help" aria-label="Help" aria-expanded="false" aria-controls="sidebarHelpMenu"><span class="icon-slot" data-icon="circleHelp"></span></button>
-      </div>
-      <div class="sidebar-help-menu" id="sidebarHelpMenu" hidden>
-        <button type="button" id="sidebarHelpSettings"><span class="icon-slot" data-icon="wrench"></span><span>Settings</span></button>
-        <button type="button" id="sidebarHelpShortcuts"><span class="icon-slot" data-icon="command"></span><span>Keyboard shortcuts</span></button>
-        <a href="https://developers.openai.com/codex/" target="_blank" rel="noopener noreferrer"><span class="icon-slot" data-icon="circleHelp"></span><span>Help</span></a>
       </div>
       <span id="threadSource" hidden>local</span>
     </div>
@@ -97,6 +91,7 @@
       </div>
     </section>
     <div class="composer-dock">
+      <button id="conversationLatest" class="conversation-latest" type="button" hidden>回到最新</button>
       <form class="composer" id="composer">
         <section class="composer-queue" id="composerQueue" aria-label="Queued messages" aria-live="polite" hidden></section>
         <div class="composer-autocomplete" id="composerAutocomplete" role="listbox" aria-label="Composer suggestions" hidden></div>
@@ -246,7 +241,6 @@
         <section class="settings-nav-group" data-settings-group="personal"><h2>Personal</h2><button type="button" class="active" data-settings-page="general-settings"><span class="icon-slot" data-icon="wrench"></span><span>General</span></button><button type="button" data-settings-page="access-settings" data-settings-available="false" hidden><span class="icon-slot" data-icon="shield"></span><span>Public access</span></button><button type="button" data-settings-page="appearance"><span class="icon-slot" data-icon="monitor"></span><span>Appearance</span></button><button type="button" data-settings-page="agent"><span class="icon-slot" data-icon="terminal"></span><span>Configuration</span></button><button type="button" data-settings-page="global-instructions"><span class="icon-slot" data-icon="file"></span><span>Global instructions</span></button><button type="button" data-settings-page="profile"><span class="icon-slot" data-icon="userRound"></span><span>Profile</span></button><button type="button" data-settings-page="keyboard-shortcuts"><span class="icon-slot" data-icon="command"></span><span>Keyboard shortcuts</span></button></section>
         <section class="settings-nav-group" data-settings-group="integrations"><h2>Integrations</h2><button type="button" data-settings-page="plugins-settings"><span class="icon-slot" data-icon="wrench"></span><span>Plugins</span></button><button type="button" data-settings-page="skills-settings"><span class="icon-slot" data-icon="file"></span><span>Skills</span></button><button type="button" data-settings-page="browser-use"><span class="icon-slot" data-icon="globe"></span><span>Browser</span></button></section>
         <section class="settings-nav-group" data-settings-group="coding"><h2>Coding</h2><button type="button" data-settings-page="connections"><span class="icon-slot" data-icon="monitor"></span><span>MCP servers</span></button><button type="button" data-settings-page="code-review"><span class="icon-slot" data-icon="fileDiff"></span><span>Code review</span></button></section>
-        <section class="settings-nav-group" data-settings-group="archived"><h2>Archived</h2><button type="button" data-settings-page="data-controls"><span class="icon-slot" data-icon="list"></span><span>Archived chats</span></button></section>
         <div class="settings-nav-empty" id="settingsNavEmpty" hidden>No results found</div>
       </div>
     </aside>
