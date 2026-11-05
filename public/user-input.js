@@ -30,7 +30,7 @@ export function createUserInputDialog({ respond, t = text => text, document = gl
         const radio = document.createElement('input'); radio.type = 'radio'; radio.name = name; radio.value = value;
         const copy = document.createElement('span'), text = document.createElement('strong'); text.textContent = label; copy.append(text);
         if (description) { const detail = document.createElement('span'); detail.textContent = description; copy.append(detail); }
-        row.append(radio, copy); fieldset.append(row); choices.push(radio); return radio;
+        row.append(radio, copy); row.insertAdjacentHTML('beforeend', codexIcon('check', 'user-input-choice-check')); fieldset.append(row); choices.push(radio); return radio;
       }
       options.forEach((option, optionIndex) => addChoice(option.label, option.description, String(optionIndex)));
       let custom, other;
@@ -60,7 +60,13 @@ export function createUserInputDialog({ respond, t = text => text, document = gl
       dialog.dataset.requestState = next; title.textContent = t(statusLabel(next));
       const finished = requestFinished(next);
       form.hidden = finished; receipt.hidden = !finished;
-      receipt.querySelector('summary').textContent = `${t(statusLabel(next))} · ${t('Submit answers')}`;
+      const summary = receipt.querySelector('summary'), answers = fields.filter(field => !field.question.isSecret && field.answer());
+      summary.textContent = answers.length ? t('Selected: ') : `${t(statusLabel(next))} · `;
+      if (answers.length) {
+        const selected = document.createElement('strong'); selected.textContent = answers.map(field => field.answer()).join('；');
+        summary.append(selected);
+      } else summary.append(document.createTextNode(t('Submit answers')));
+      receipt.querySelector('pre').textContent = fields.map(field => [field.question.question, !field.question.isSecret && field.answer()].filter(Boolean).join('\n')).join('\n\n');
       fields.forEach(({ fieldset }) => { fieldset.disabled = next !== 'awaiting'; fieldset.hidden = next === 'accepted' || next === 'ended'; });
       context.hidden = next !== 'accepted' && next !== 'ended';
       actions.hidden = next !== 'awaiting' && next !== 'submitting'; update();
@@ -105,3 +111,4 @@ export function createUserInputDialog({ respond, t = text => text, document = gl
   return show;
 }
 import { createRequestReceipt, mountRequestCard, requestFinished } from './request-receipt.js';
+import { codexIcon } from './codex-icons.js';

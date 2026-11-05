@@ -96,14 +96,14 @@ test('another window cannot silently overwrite a saved draft', async () => {
 test('question choices restore after refresh and show submitting, accepted and ended distinctly', async () => {
   const storage = new JSDOM('', { url: 'https://example.test' }).window.localStorage;
   const drafts = createDraftStore({ storage, delay: 60_000, rpc: async (_method, params) => ({ draft: { revision: 1, value: params.value } }) });
-  const request = { id: 1, method: 'item/tool/requestUserInput', params: { threadId: 'a', turnId: 'turn', questions: [{ id: 'q', question: '重启？', options: [{ label: '允许' }, { label: '暂不' }] }] } };
+  const request = { id: 1, method: 'item/tool/requestUserInput', params: { threadId: 'a', turnId: 'turn', itemId: 'question-item', questions: [{ id: 'q', question: '重启？', options: [{ label: '允许' }, { label: '暂不' }] }] } };
   const record = { key: 'key', status: 'awaiting', request }, response = deferred();
   const create = document => createUserInputDialog({ document, respond: async () => response.promise, getDraft: (id, key) => drafts.get(id, `question:${key}`), saveDraft: (id, key, value) => drafts.set(id, `question:${key}`, value) });
   try {
     const old = new JSDOM('<main id="conversation"></main>'), show = create(old.window.document);
     show.setThread('a'); show.sync([record]); old.window.document.querySelectorAll('input')[1].click();
     await drafts.flush('a', 'question:key');
-    const refreshed = new JSDOM('<main id="conversation"><article data-turn-id="turn"><div class="turn-event-stream"></div></article></main>'), restored = create(refreshed.window.document);
+    const refreshed = new JSDOM('<main id="conversation"><article data-turn-id="turn"><div class="turn-event-stream"><div class="assistant-response" data-item-id="question-item"></div><div class="later-message"></div></div></article></main>'), restored = create(refreshed.window.document);
     restored.setThread('a'); restored.sync([record]);
     expect(refreshed.window.document.querySelectorAll('input')[1].checked).toBe(true);
     refreshed.window.document.querySelector('form').dispatchEvent(new refreshed.window.Event('submit', { cancelable: true }));
@@ -114,11 +114,17 @@ test('question choices restore after refresh and show submitting, accepted and e
     expect(card.parentElement.className).toBe('turn-event-stream');
     expect(card.querySelector('form').hidden).toBe(true);
     expect(card.querySelector('details').open).toBe(false);
+    expect(card.querySelector('summary strong').textContent).toBe('暂不');
+    expect(card.querySelector('pre').textContent).toBe('重启？\n暂不');
+    expect(card.previousElementSibling.dataset.itemId).toBe('question-item');
+    expect(card.nextElementSibling.className).toBe('later-message');
     restored.sync([{ ...record, status: 'ended' }]);
     expect(refreshed.window.document.querySelector('section').dataset.requestState).toBe('ended');
     expect(refreshed.window.document.querySelector('button').disabled).toBe(true);
     restored.sync([{ ...record, status: 'ended' }]);
     expect(refreshed.window.document.querySelectorAll('.request-receipt')).toHaveLength(1);
+    expect(card.nextElementSibling.className).toBe('later-message');
+    expect(card.querySelector('summary strong').textContent).toBe('暂不');
     refreshed.window.document.querySelector('article').remove();
     restored.setThread('a');
     expect(refreshed.window.document.querySelector('section')).toBeNull();
