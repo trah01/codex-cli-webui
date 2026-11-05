@@ -93,7 +93,7 @@ const sessionService = new SessionService({
 const pendingRequests = new PendingRequests({ path: `${managedPasswordPath}.requests.json`, onChange: (id, requests) => sessionService.publish(id, { requests }) });
 const { answer: answerBrowserRequest, saveDraft: saveSessionDraft } = createSessionRequestHandlers({ requests: pendingRequests, sessions: sessionService, send: sendRaw, enqueue: params => messageQueue.enqueue(params) });
 const eventChannels = new Map<string, { send: (message: any) => void }>();
-const settingsService = createSettingsService(request, { codexHome: () => resolve(codexSessionsRoot, "..") });
+const settingsService = createSettingsService(request, { codexHome: () => resolve(codexSessionsRoot, ".."), projectRoots: [...new Set([...browseRoots, defaultCwd])] });
 const threadPaths = new Map<string, string>();
 let codexSessionsRoot = resolve(process.env.CODEX_HOME || resolve(homeDir, ".codex"), "sessions");
 let seq = 1;

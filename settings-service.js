@@ -1,4 +1,5 @@
 import { createGlobalInstructionsStore } from './global-instructions.js';
+import { createProjectInstructionsStore } from './project-instructions.js';
 
 const CONFIG_FIELDS = {
   webSearch: 'web_search',
@@ -7,6 +8,7 @@ const CONFIG_FIELDS = {
 
 export function createSettingsService(request, options = {}) {
   const globalInstructions = createGlobalInstructionsStore(options);
+  const projectInstructions = createProjectInstructionsStore(options);
   async function read(cwd) {
     const result = await request('config/read', { includeLayers: false, ...(cwd ? { cwd } : {}) });
     const config = result.config || {};
@@ -20,6 +22,7 @@ export function createSettingsService(request, options = {}) {
   async function write(params) {
     const { field, value } = params;
     if (field === 'globalInstructions') return globalInstructions.write(params);
+    if (field === 'projectInstructions') return projectInstructions.write(params);
     if (!Object.hasOwn(CONFIG_FIELDS, field)) throw new Error('This setting cannot be changed from WebUI');
     if (field === 'webSearch' && !['disabled', 'cached', 'live'].includes(value)) throw new Error('Invalid web search mode');
     if (field === 'instructions' && (typeof value !== 'string' || value.length > 100000)) throw new Error('Invalid instructions');
@@ -46,7 +49,11 @@ export function createSettingsService(request, options = {}) {
 
   return async function dispatch(method, params = {}) {
     if (params.cwd != null && typeof params.cwd !== 'string') throw new Error('Invalid working folder');
-    if (method === 'host/settings/read') return params.scope === 'global-instructions' ? globalInstructions.read() : read(params.cwd);
+    if (method === 'host/settings/read') {
+      if (params.scope === 'global-instructions') return globalInstructions.read();
+      if (params.scope === 'project-instructions') return projectInstructions.read(params.cwd);
+      return read(params.cwd);
+    }
     if (method === 'host/settings/write') return write(params);
     if (method === 'host/skills/set-enabled') return setSkill(params);
     if (method === 'host/mcp/set-enabled') return setMcp(params);

@@ -932,3 +932,21 @@ body.sidebar-hidden .sidebar>div{opacity:0}
 .request-receipt>summary:focus-visible{outline:2px solid var(--text);outline-offset:2px}
 .request-receipt>pre{max-height:180px;overflow:auto;margin:4px 0 8px;padding:10px;border:1px solid var(--app-border-default);border-radius:8px;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.6 var(--mono)}
 .user-input-card>form[hidden],.request-receipt[hidden]{display:none}
+.project-context-menu{position:fixed;z-index:90;min-width:180px;padding:4px;border:1px solid var(--app-border-default);border-radius:8px;background:var(--app-panel);color:var(--app-text);box-shadow:var(--app-elevation-shadow);font-size:var(--ui-font-size)}
+.project-context-menu[hidden]{display:none}
+.project-context-menu button{display:block;width:100%;min-height:36px;padding:7px 12px;border-radius:5px;text-align:left}
+.project-context-menu button:hover,.project-context-menu button:focus-visible{background:var(--app-hover)}
+.project-context-menu button:focus-visible{outline:2px solid var(--app-link);outline-offset:-2px}
+.project-context-menu button:active{background:var(--app-fog)}
+.project-instructions-dialog{position:fixed;inset:0;width:min(800px,calc(var(--interface-viewport-width) - 28px));max-width:none;max-height:calc(var(--interface-viewport-height) - 28px);margin:auto;padding:0;border:1px solid var(--app-border-default);border-radius:12px;background:var(--app-main);color:var(--app-text);font:inherit;box-shadow:var(--app-elevation-shadow)}
+.project-instructions-dialog::backdrop{background:rgba(0,0,0,.4)}
+.project-instructions-dialog form{display:flex;flex-direction:column;height:min(640px,calc(var(--interface-viewport-height) - 30px));padding:16px;gap:12px}
+.project-instructions-header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.project-instructions-header strong{font-size:var(--ui-font-size);font-weight:600}
+.project-instructions-path{margin:0;color:var(--app-text-secondary);font-size:var(--ui-font-small);overflow-wrap:anywhere}
+.project-instructions-dialog textarea{flex:1;min-height:120px;width:100%;resize:none;padding:12px;border:1px solid var(--app-border-default);border-radius:8px;background:var(--app-main);color:var(--app-text);font:inherit;font-size:var(--ui-font-size);line-height:1.6;tab-size:2}
+.project-instructions-dialog :is(textarea,button):focus-visible{outline:2px solid var(--app-link);outline-offset:2px}
+.project-instructions-dialog :is(textarea,button):disabled{opacity:.5;cursor:not-allowed}
+.project-instructions-actions{display:flex;align-items:center;justify-content:flex-end;gap:12px}
+.project-instructions-actions [role=status]{min-width:0;flex:1;color:var(--app-text-secondary);font-size:var(--ui-font-small);overflow-wrap:anywhere}
+@media(max-width:720px){.project-instructions-dialog form{padding:12px}.project-instructions-dialog button,.project-context-menu button{min-height:44px}}

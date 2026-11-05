@@ -4,6 +4,14 @@ export const LOCALE_PREFERENCES = Object.freeze(["system", "zh-CN", "en"]);
 const ZH_CN = Object.create(null);
 
 Object.assign(ZH_CN, {
+  "Edit AGENTS.md": "编辑 AGENTS.md",
+  "Close": "关闭",
+  "Saved": "已保存",
+  "Project instructions": "项目指令",
+  "Discard unsaved changes?": "放弃未保存的修改？",
+  "AGENTS.md must be a regular file": "AGENTS.md 必须是普通文件，不能是文件夹或符号链接。",
+  "AGENTS.md exceeds the 1 MB limit": "AGENTS.md 不能超过 1 MB。",
+  "AGENTS.md changed. Reopen the editor before saving.": "AGENTS.md 已被修改，请重新打开编辑器后再保存。",
   "Answer queued": "回答已加入发送队列",
   "Avatar": "头像",
   "Use a PNG, JPEG, WebP or GIF image up to 2 MB.": "请选择不超过 2 MB 的 PNG、JPEG、WebP 或 GIF 图片。",
