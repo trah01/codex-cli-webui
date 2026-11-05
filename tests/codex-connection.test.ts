@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { createCodexConnection, resolveCodexConnection } from '../codex-connection.js';
+import { createCodexConnection, resolveCodexConnection } from '../server/codex-connection.js';
 
 test('auto shares an existing daemon and otherwise starts an isolated backend', () => {
   const env = { HOME: '/home/example' };

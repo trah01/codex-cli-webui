@@ -70,7 +70,7 @@ async function rejectedWebSocketStatus() {
 
 beforeAll(async () => {
   port = await freePort();
-  proc = startProcess([process.execPath, "--import", "tsx", "server.ts"], {
+  proc = startProcess([process.execPath, "--import", "tsx", "server/index.ts"], {
     cwd: ROOT,
     env: { ...process.env, PORT: String(port), HOST: "127.0.0.1", CODEX_WEBUI_PASSWORD: "", CODEX_WEBUI_ACCESS_TOKEN: "integration-access-token" },
     stdout: "pipe",

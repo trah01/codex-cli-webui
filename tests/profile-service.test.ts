@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { buildAccountIdentity, fetchCodexProfile, profileInitials } from "../profile-service.js";
+import { buildAccountIdentity, fetchCodexProfile, profileInitials } from "../server/profile-service.js";
 
 const temporaryDirectories: string[] = [];
 afterEach(() => {

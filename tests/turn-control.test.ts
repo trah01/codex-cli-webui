@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { interruptThread } from '../turn-control.js';
+import { interruptThread } from '../server/turn-control.js';
 
 test('interrupts the exact requested turn without resuming an already loaded thread', async () => {
   const calls = [], params = { threadId: 'thread-1', turnId: 'turn-1' };

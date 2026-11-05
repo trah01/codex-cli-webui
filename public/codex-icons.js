@@ -1,5 +1,5 @@
 // Exact Lucide 0.456.0 icon nodes extracted from Codex.app's app.asar.
-// Lucide is ISC licensed; see THIRD_PARTY_NOTICES.md in this project.
+// Lucide is ISC licensed; see docs/legal/第三方声明.md in this project.
 export const codexIconNodes = {
   arrowUp: '<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',

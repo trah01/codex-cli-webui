@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { context } from 'esbuild';
 
-const root = fileURLToPath(new URL('.', import.meta.url));
+const root = fileURLToPath(new URL('..', import.meta.url));
 const frontend = await context({
   absWorkingDir: root,
   entryPoints: ['public/app.js'],
@@ -13,7 +13,7 @@ const frontend = await context({
   logLevel: 'info',
 });
 await frontend.watch();
-const server = spawn(process.execPath, ['--watch', '--import', 'tsx', 'server.ts'], {
+const server = spawn(process.execPath, ['--watch', '--import', 'tsx', 'server/index.ts'], {
   cwd: root,
   env: process.env,
   stdio: ['ignore', 'inherit', 'inherit'],

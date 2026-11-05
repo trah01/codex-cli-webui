@@ -1,7 +1,7 @@
 import { readFileSync, mkdirSync, writeFileSync, renameSync, unlinkSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { isLocalAuthManagementRequest } from './server-security.js';
+import { isDirectLocalRequest } from './server-security.js';
 
 export function normalizeBoundDomain(value) {
   if (typeof value !== 'string') throw new Error('Enter a domain without a protocol, port or path');
@@ -36,10 +36,11 @@ function matchesDomain(host, domain) {
 
 // Forwarded hosts can only select the explicitly configured domain, never local access.
 export function boundDomainRequest(req, domain) {
-  if (isLocalAuthManagementRequest(req)) return req;
+  if (isDirectLocalRequest(req)) return req;
   if (!domain) return null;
   if (matchesDomain(req.headers.host, domain)) return req;
   const forwardedHost = req.headers['x-forwarded-host'];
   if (!matchesDomain(forwardedHost, domain)) return null;
   return { socket: req.socket, headers: { ...req.headers, host: forwardedHost } };
 }
+

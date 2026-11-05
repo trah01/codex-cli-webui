@@ -6,7 +6,7 @@ import {
   isAllowedProfileAvatarUrl,
   isLocalAccountRequest,
   toPublicAccountIdentity,
-} from "../profile-service.js";
+} from "../server/profile-service.js";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;

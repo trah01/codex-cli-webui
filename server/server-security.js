@@ -26,6 +26,9 @@ const BROWSER_RPC_METHODS = new Set([
   "host/thread/requests",
   "host/request/respond",
   "host/thread/send",
+  "host/subagents/list",
+  "host/subagents/delegate",
+  "host/subagents/stop",
   "host/thread/queue/list",
   "host/thread/queue/cancel",
   "host/thread/queue/retry",
@@ -40,6 +43,7 @@ const PUBLIC_ASSETS = new Set([
   "/style.css",
   "/favicon.svg",
   "/auth-bootstrap.js",
+  "/passkey-client.js",
   "/i18n.js",
   "/codex-brand.js",
   "/app.bundle.js",
@@ -166,12 +170,17 @@ export function isAllowedBrowserRpcMethod(method) {
   return typeof method === "string" && BROWSER_RPC_METHODS.has(method);
 }
 
-export function isLocalAuthManagementRequest(req) {
+export function isDirectLocalRequest(req) {
   const address = String(req.socket?.remoteAddress || "").replace(/^::ffff:/, "");
   const headers = req.headers || {};
-  return address === "127.0.0.1"
-    && /^127\.0\.0\.1(?::[0-9]+)?$/.test(headers.host || "")
-    && !["forwarded", "x-forwarded-for", "x-forwarded-host", "x-forwarded-proto", "x-real-ip"].some(name => headers[name] !== undefined)
+  return ((address === "127.0.0.1" && /^127\.0\.0\.1(?::[0-9]+)?$/.test(headers.host || ""))
+      || (["127.0.0.1", "::1"].includes(address) && /^localhost(?::[0-9]+)?$/i.test(headers.host || "")))
+    && !["forwarded", "x-forwarded-for", "x-forwarded-host", "x-forwarded-proto", "x-real-ip"].some(name => headers[name] !== undefined);
+}
+
+export function isLocalAuthManagementRequest(req) {
+  const headers = req.headers || {};
+  return isDirectLocalRequest(req)
     && headers["sec-fetch-site"] !== "cross-site"
     && isSameOrigin(headers.origin, headers.host);
 }

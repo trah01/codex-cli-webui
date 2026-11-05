@@ -38,7 +38,7 @@ function rawRequest(port, request) {
 }
 
 const port = await freePort();
-const server = startProcess([process.execPath, '--import', 'tsx', 'server.ts'], {
+const server = startProcess([process.execPath, '--import', 'tsx', 'server/index.ts'], {
   cwd: root,
   env: { ...process.env, HOST: '127.0.0.1', PORT: String(port) },
   stdout: 'pipe',

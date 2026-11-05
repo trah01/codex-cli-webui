@@ -2,8 +2,8 @@ import { describe, expect, test } from "vitest";
 import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { createStoredPassword } from "../server-security.js";
-import { loadStoredPassword, passwordStorePath, saveStoredPassword, replaceStoredPassword } from "../password-store.js";
+import { createStoredPassword } from "../server/server-security.js";
+import { loadStoredPassword, passwordStorePath, saveStoredPassword, replaceStoredPassword } from "../server/password-store.js";
 
 describe("managed LAN password store", () => {
   test("atomically replaces credentials without storing plaintext", () => {

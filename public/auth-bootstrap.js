@@ -1,3 +1,4 @@
+import { supportsPasskeys, usePasskey, passkeyError } from './passkey-client.js';
 import { codexInterfaceMark } from './codex-brand.js';
 import { createDomI18n, createI18n } from './i18n.js';
 
@@ -31,13 +32,23 @@ async function start(){
       catch{logout.disabled=false;logout.textContent=t('Try again')}
     };
   };
-  if(status.authenticated){enableLogout();await loadApp();return}
+  if(status.authenticated){if(status.loginRequired!==false)enableLogout();await loadApp();return}
   const gate=$('#passwordGate'),app=$('#app'),input=$('#passwordInput'),confirmInput=$('#passwordConfirmInput'),form=$('#passwordLoginForm'),button=$('#passwordLoginButton'),error=$('#passwordError'),title=$('#passwordTitle');
   let mode=status.setupRequired?'setup':'login';
   const username=$('#loginUsername');username.hidden=!(status.usernameRequired||status.setupRequired);username.required=!username.hidden;
   const otp=$('#otpInput');otp.hidden=!status.otpRequired;otp.required=Boolean(status.otpRequired);otp.placeholder=t('Verification code');
   const oidc=$('#oidcLoginButton');oidc.hidden=!status.oidcEnabled;oidc.textContent=t('Single sign-on');oidc.onclick=()=>{location.href='/api/auth/oidc/start'};
   if(status.passwordEnabled===false){input.hidden=true;input.required=false;username.hidden=true;username.required=false;button.hidden=true;}
+  const passkey=$('#passkeyLoginButton');passkey.textContent=t('Sign in with a passkey');
+  passkey.hidden=!status.passkeyEnabled||!supportsPasskeys();
+  passkey.onclick=async()=>{
+    if(status.passkeyOrigin!==location.origin){location.href=new URL('/',status.passkeyOrigin).href;return}
+    passkey.disabled=true;button.disabled=true;error.hidden=true;
+    try{await usePasskey('login');location.reload()}
+    catch(reason){error.textContent=t(passkeyError(reason));error.hidden=false}
+    finally{passkey.disabled=false;button.disabled=false}
+  };
+
 
   $('#passwordCodexMark').innerHTML=codexInterfaceMark('password-codex-mark');
   const configure=()=>{
@@ -51,7 +62,7 @@ async function start(){
     confirmInput.hidden=!setup;confirmInput.required=setup;confirmInput.value='';
     button.textContent=t(setup?'Set password':'Log in');
   };
-  configure();gate.hidden=false;app.setAttribute('aria-hidden','true');app.inert=true;requestAnimationFrame(()=>status.passwordEnabled===false?oidc.focus():input.focus());
+  configure();gate.hidden=false;app.setAttribute('aria-hidden','true');app.inert=true;requestAnimationFrame(()=>!passkey.hidden?passkey.focus():status.passwordEnabled===false?oidc.focus():input.focus());
   if(status.setupRequired&&!status.canManageCredentials){
     title.textContent=t('Public access is not configured');
     input.hidden=true;confirmInput.hidden=true;username.hidden=true;button.hidden=true;

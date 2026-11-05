@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { browserSandboxFor, normalizeBrowserUrl } from "../public/browser-panel.js";
+import { browserNavigationTarget, browserSandboxFor, normalizeBrowserUrl } from "../public/browser-panel.js";
 
 describe("browser panel URLs", () => {
   test("normalizes host-like input to HTTPS", () => {
@@ -26,5 +26,14 @@ describe("browser panel URLs", () => {
     const app = "http://127.0.0.1:8899/";
     expect(browserSandboxFor("https://example.com/app", app)).toContain("allow-same-origin");
     expect(browserSandboxFor("http://127.0.0.1:8899/api/config", app)).not.toContain("allow-same-origin");
+  });
+
+  test('external sites open normally while local pages and explicitly requested previews remain embedded', () => {
+    const app = 'http://127.0.0.1:8899';
+    expect(browserNavigationTarget('www.baidu.com', app)).toMatchObject({ url: 'https://www.baidu.com/', action: 'external' });
+    expect(browserNavigationTarget('http://localhost:3000', app).action).toBe('preview');
+    expect(browserNavigationTarget('http://192.168.1.2:8080', app).action).toBe('preview');
+    expect(browserNavigationTarget('https://example.com', app, 'preview').action).toBe('preview');
+    expect(browserNavigationTarget('javascript:alert(1)', app).error).not.toBe('');
   });
 });

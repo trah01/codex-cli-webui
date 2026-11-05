@@ -1,8 +1,8 @@
 import { mkdirSync, readFileSync, writeFileSync, renameSync, unlinkSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { bridgeErrorCode, THREAD_ACTIVE_WRITER, THREAD_NOT_FOUND } from './public/bridge-errors.js';
-import { validateImageInputs } from './public/composer-input.js';
+import { bridgeErrorCode, THREAD_ACTIVE_WRITER, THREAD_NOT_FOUND } from '../public/bridge-errors.js';
+import { validateImageInputs } from '../public/composer-input.js';
 
 const errorText = error => error?.message || String(error);
 const isBusy = error => bridgeErrorCode(error) === THREAD_ACTIVE_WRITER || /(?:already|another|existing).*active turn|turn.*(?:already running|in progress)/i.test(errorText(error));

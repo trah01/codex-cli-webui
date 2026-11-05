@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'vitest';
 import { generateKeyPairSync, sign } from 'node:crypto';
 import * as oidc from 'openid-client';
-import { authenticationConfig, createAuthentication, authorizeAuthenticationRequest } from '../authentication.js';
-import { createPasswordSession } from '../server-security.js';
+import { authenticationRequirements, authenticationConfig, createAuthentication, authorizeAuthenticationRequest } from '../server/authentication.js';
+import { createPasswordSession } from '../server/server-security.js';
 
 const secret = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
 const request = (headers = {}) => ({ socket: { remoteAddress: '127.0.0.1' }, headers: { host: '127.0.0.1:8899', ...headers } });
@@ -21,7 +21,6 @@ describe('authentication boundary', () => {
     for (const env of [
       { CODEX_WEBUI_AUTH_MODE: 'oidc' }, { CODEX_WEBUI_AUTH_MODE: 'typo' },
       { ...oidcEnv, CODEX_WEBUI_OIDC_ISSUER: 'http://identity.example.com' },
-      { ...oidcEnv, CODEX_WEBUI_OIDC_ALLOWED_SUBJECTS: '' },
       { ...oidcEnv, CODEX_WEBUI_OIDC_REDIRECT_URI: 'https://codex.example.com/wrong' },
       { CODEX_WEBUI_OTP_SECRET: 'short' },
     ]) expect(() => authenticationConfig(env)).toThrow();
@@ -89,7 +88,7 @@ describe('authentication boundary', () => {
 const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
 function providerHarness(subject = 'admin-subject', overrides = {}, badSignature = false) {
   const config = authenticationConfig(oidcEnv);
-  let nonce, tokenRequests = 0;
+  let nonce, callbackAddress, tokenRequests = 0;
   const json = body => new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
   const mockFetch = async (input, options) => {
     const url = String(input);
@@ -103,6 +102,7 @@ function providerHarness(subject = 'admin-subject', overrides = {}, badSignature
     if (url.endsWith('/token')) {
       tokenRequests++;
       expect(String(options.body)).toContain('code_verifier=');
+      expect(new URLSearchParams(String(options.body)).get('redirect_uri')).toBe(callbackAddress);
       const head = Buffer.from(JSON.stringify({ alg: 'RS256', kid: 'key' })).toString('base64url');
       const body = Buffer.from(JSON.stringify({ iss: 'https://identity.example.com/', aud: 'codex', sub: subject, nonce, iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 300, ...overrides })).toString('base64url');
       const data = `${head}.${body}`;
@@ -111,11 +111,13 @@ function providerHarness(subject = 'admin-subject', overrides = {}, badSignature
     throw new Error('Unexpected provider URL');
   };
   const auth = createAuthentication(config, { discover: (issuer, id, clientSecret) => oidc.discovery(issuer, id, clientSecret, undefined, { [oidc.customFetch]: mockFetch }) });
-  return { auth, tokenRequests: () => tokenRequests, async flow() {
-    const flow = await auth.startOidc(), url = new URL(flow.url);
+  return { auth, tokenRequests: () => tokenRequests, async flow(redirectUri = config.provider.redirectUri) {
+    const flow = await auth.startOidc(redirectUri), url = new URL(flow.url);
+    callbackAddress = redirectUri;
     nonce = url.searchParams.get('nonce');
     expect(url.searchParams.get('code_challenge_method')).toBe('S256');
-    const callback = new URL(config.provider.redirectUri);
+    expect(url.searchParams.get('redirect_uri')).toBe(redirectUri);
+    const callback = new URL(redirectUri);
     callback.searchParams.set('state', url.searchParams.get('state'));
     callback.searchParams.set('code', 'test-code');
     return { callback, req: request({ cookie: cookieOf(flow.cookie) }) };
@@ -123,7 +125,24 @@ function providerHarness(subject = 'admin-subject', overrides = {}, badSignature
 }
 
 describe('OIDC authorization code flow', () => {
-  test('accepts a signed allowed identity once, using PKCE and browser-bound state', async () => {
+  test('rejects a callback on a different host or protocol without consuming the valid flow', async () => {
+    const provider = providerHarness();
+    const { callback, req } = await provider.flow('http://127.0.0.1:8899/api/auth/oidc/callback');
+    const wrong = new URL(callback); wrong.hostname = 'codex.example.com';
+    await expect(provider.auth.finishOidc(wrong, req)).rejects.toThrow('callback address mismatch');
+    wrong.hostname = callback.hostname; wrong.protocol = 'https:';
+    await expect(provider.auth.finishOidc(wrong, req)).rejects.toThrow('callback address mismatch');
+    expect(provider.tokenRequests()).toBe(0);
+    await provider.auth.finishOidc(callback, req);
+  });
+  test('accepts any identity verified by the configured provider, ignoring legacy subject lists', async () => {
+    for (const subject of ['first-user', 'second-user']) {
+      const provider = providerHarness(subject);
+      const { callback, req } = await provider.flow();
+      await expect(provider.auth.finishOidc(callback, req)).resolves.toBeUndefined();
+    }
+  });
+  test('accepts a signed identity once, using PKCE and browser-bound state', async () => {
     const provider = providerHarness();
     const { callback, req } = await provider.flow();
     await expect(provider.auth.finishOidc(callback, request())).rejects.toThrow();
@@ -132,9 +151,9 @@ describe('OIDC authorization code flow', () => {
     expect(provider.tokenRequests()).toBe(1);
     await expect(provider.auth.finishOidc(callback, req)).rejects.toThrow();
   });
-  test('rejects unlisted subjects and incorrect nonce, audience, issuer or expiry', async () => {
+  test('rejects incorrect nonce, audience, issuer or expiry', async () => {
     for (const [sub, claims] of [
-      ['other-user', {}], ['admin-subject', { nonce: 'wrong' }], ['admin-subject', { aud: 'wrong' }],
+      ['admin-subject', { nonce: 'wrong' }], ['admin-subject', { aud: 'wrong' }],
       ['admin-subject', { iss: 'https://attacker.example.com' }], ['admin-subject', { exp: 1 }],
     ]) {
       const provider = providerHarness(sub, claims);
@@ -153,4 +172,18 @@ describe('OIDC authorization code flow', () => {
     await expect(provider.auth.finishOidc(callback, req)).rejects.toThrow();
     expect(provider.tokenRequests()).toBe(0);
   });
+});
+
+test('direct local access only needs a password unless local login is disabled', () => {
+  for (const mode of ['password', 'both', 'oidc']) {
+    const config = authenticationConfig({ ...oidcEnv, CODEX_WEBUI_AUTH_MODE: mode, CODEX_WEBUI_OTP_SECRET: secret });
+    expect(authenticationRequirements(request(), config)).toEqual({ local: true, loginRequired: true, passwordEnabled: true, oidcEnabled: false, otpRequired: false });
+    expect(authenticationRequirements(request(), config, 'false').loginRequired).toBe(false);
+    for (const req of [request({ host: 'codex.example.com' }), request({ 'x-forwarded-for': '127.0.0.1' }), request({ origin: 'https://evil.example' }), request({ 'sec-fetch-site': 'cross-site' })]) {
+      expect(authenticationRequirements(req, config, 'false').loginRequired).toBe(true);
+    }
+    const remote = authenticationRequirements(request({ host: 'codex.example.com' }), config, 'false');
+    expect(remote.oidcEnabled).toBe(mode !== 'password');
+    expect(remote.otpRequired).toBe(mode !== 'oidc');
+  }
 });

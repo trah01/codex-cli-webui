@@ -21,7 +21,7 @@ const port=await new Promise((resolvePort,reject)=>{
 
 let output='';
 let browser;
-const dev=spawn(process.execPath,['--import','tsx','dev.ts'],{
+const dev=spawn(process.execPath,['--import','tsx','scripts/dev.ts'],{
   cwd:root,
   env:{...process.env,HOST:'127.0.0.1',PORT:String(port),CODEX_WEBUI_PASSWORD:'',CODEX_WEBUI_ACCESS_TOKEN:''},
   stdio:['ignore','pipe','pipe'],

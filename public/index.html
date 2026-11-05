@@ -25,6 +25,7 @@
     <input id="otpInput" type="text" placeholder="Verification code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" hidden>
     <div class="password-error" id="passwordError" role="alert" hidden></div>
     <button id="passwordLoginButton" type="submit">Log in</button>
+    <button id="passkeyLoginButton" type="button" hidden>Sign in with a passkey</button>
     <button id="oidcLoginButton" type="button" hidden>Single sign-on</button>
   </form>
 </section>
@@ -58,7 +59,6 @@
     </div>
     <div class="sidebar-scroll">
       <span id="projectName" hidden>codex-cli-webui</span><span id="projectPath" hidden>~/projects/codex-cli-webui</span>
-      <button class="sidebar-row projects-button" id="projectButton" type="button"><span class="icon-slot" data-icon="folderOpen"></span><span>Projects</span></button>
       <div class="thread-list" id="threadList"><div class="list-state">Connecting to Codex…</div></div>
     </div>
     <div class="sidebar-footer">
@@ -67,7 +67,6 @@
         <div class="account-menu-separator"></div>
         <button type="button" class="account-menu-row" id="accountProfile"><span class="icon-slot" data-icon="userRound"></span><span>Profile</span></button>
         <button type="button" class="account-menu-row" id="accountSettings"><span class="icon-slot" data-icon="wrench"></span><span>Settings</span></button>
-        <button type="button" class="account-menu-row" id="accountShortcuts"><span class="icon-slot" data-icon="command"></span><span>Keyboard shortcuts</span></button>
         <div class="account-menu-separator"></div>
         <div class="account-menu-status"><span class="status-dot" id="statusDot"></span><span id="statusText">Connecting</span></div>
         <button type="button" class="account-menu-row" id="accountLogout"><span class="icon-slot" data-icon="logOut"></span><span>Log out</span></button>
@@ -75,7 +74,7 @@
       <div class="sidebar-footer-row">
         <button class="account-button" id="accountButton" type="button" aria-expanded="false" aria-controls="accountMenu">
           <span class="account-avatar account-initials" id="accountAvatar">?</span>
-          <span class="account-button-copy"><strong id="accountName">Settings</strong><small id="accountFooterMeta" aria-hidden="true"></small></span>
+          <span class="account-button-copy"><strong id="accountName">Codex</strong><small id="accountFooterMeta" aria-hidden="true"></small></span>
         </button>
       </div>
       <span id="threadSource" hidden>local</span>
@@ -96,6 +95,9 @@
     </section>
     <div class="composer-dock">
       <button id="conversationLatest" class="conversation-latest" type="button" hidden>回到最新</button>
+      <div class="composer-workspace-tray">
+        <button type="button" class="composer-text-button composer-project-control" id="composerProjectButton" data-composer-control="project" aria-label="Choose project" aria-haspopup="dialog" aria-controls="folderDialog"><span class="icon-slot" data-icon="monitor"></span><span>Choose project</span><span id="composerProjectLabel">codex-cli-webui</span><span class="icon-slot chevron" data-icon="chevronDown"></span></button>
+      </div>
       <form class="composer" id="composer">
         <section class="composer-queue" id="composerQueue" aria-label="Queued messages" aria-live="polite" hidden></section>
         <div class="composer-autocomplete" id="composerAutocomplete" role="listbox" aria-label="Composer suggestions" hidden></div>
@@ -105,20 +107,20 @@
         <div class="composer-footer">
           <div class="composer-left">
             <button type="button" class="composer-circle-button add-control" data-composer-control="add" title="Attach images" aria-label="Attach images"><span class="icon-slot" data-icon="plus"></span></button>
-            <button type="button" class="composer-text-button composer-project-control" id="composerProjectButton" data-composer-control="project" aria-label="Project"><span class="icon-slot" data-icon="folderOpen"></span><span id="composerProjectLabel">codex-cli-webui</span><span class="icon-slot chevron" data-icon="chevronDown"></span></button>
             <div class="permission-picker" id="permissionPicker" data-composer-control="approval">
               <button type="button" class="composer-text-button approval-control" id="modeButton" title="Change permissions" aria-haspopup="menu" aria-expanded="false"><span class="icon-slot" data-icon="shield"></span><span class="control-label">Ask for approval</span><span class="icon-slot chevron" data-icon="chevronDown"></span></button>
               <div class="permission-menu" id="permissionMenu" role="menu" aria-label="How should Codex actions be approved?" hidden>
                 <div class="permission-options" id="permissionOptions"></div>
               </div>
             </div>
+
+          </div>
+          <div class="composer-right">
             <div class="model-picker composer-model-control" id="modelPicker" data-composer-control="model">
               <button type="button" class="composer-text-button model-trigger" id="modelButton" data-codex-intelligence-trigger aria-haspopup="menu" aria-expanded="false"><span id="modelLabel">Loading models…</span><span id="effortLabel" data-i18n-ignore>medium</span><span class="icon-slot chevron" data-icon="chevronDown"></span></button>
               <div class="model-menu" id="modelMenu" role="menu" hidden></div>
               <select id="effortSelect" class="sr-only" aria-label="Reasoning effort"><option value="medium">medium</option></select>
             </div>
-          </div>
-          <div class="composer-right">
             <button class="composer-circle-button mobile-only" id="mobileUsageButton" type="button" title="Context usage" aria-label="Context usage" aria-expanded="false" aria-controls="mobileUsagePanel"><span class="icon-slot" data-icon="info"></span></button>
             <span class="context-usage" id="contextUsage" role="img" tabindex="0" aria-label="Context usage" hidden>
               <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
@@ -157,7 +159,7 @@
         <button class="side-panel-launcher-action" type="button" data-side-panel-action="terminal"><span class="icon-slot" data-icon="terminal"></span><span>Terminal</span></button>
         <button class="side-panel-launcher-action" type="button" data-side-panel-action="browser"><span class="icon-slot" data-icon="globe"></span><span>Browser</span></button>
         <button class="side-panel-launcher-action" type="button" data-side-panel-action="files"><span class="icon-slot" data-icon="folderOpen"></span><span>Files</span></button>
-        <button class="side-panel-launcher-action" type="button" data-side-panel-action="side-task"><span class="icon-slot" data-icon="messageSquare"></span><span>Side task</span></button>
+        <button class="side-panel-launcher-action" type="button" data-side-panel-action="side-task"><span class="icon-slot" data-icon="messageSquare"></span><span>子代理</span></button>
       </div>
     </section>
     <section class="review-panel-content" id="reviewPanelContent" role="tabpanel" hidden>
@@ -179,6 +181,7 @@
           <input id="browserUrl" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="Enter URL" aria-describedby="browserStatusText">
           <button class="browser-go" type="submit" title="Go to URL" aria-label="Go to URL"><span class="icon-slot" data-icon="arrowUp"></span></button>
         </form>
+        <select class="settings-select browser-open-mode" id="browserOpenMode" aria-label="网页打开方式"><option value="auto">正常打开</option><option value="preview">内嵌预览</option></select>
         <a class="browser-external" id="browserOpenExternal" title="Open in new tab" target="_blank" rel="noopener noreferrer" hidden>Open in new tab</a>
       </div>
       <div class="browser-status" id="browserStatus" role="status" aria-live="polite">
@@ -198,9 +201,10 @@
     <section class="side-panel-terminal" id="sideTerminalPanel" role="tabpanel" hidden aria-label="Terminal">
       <div class="terminal-host side-terminal-host" id="sideTerminalHost" data-connected="false"></div>
     </section>
-    <section class="side-task-panel" id="sideTaskPanel" role="tabpanel" hidden aria-label="Side tasks">
+    <section class="side-task-panel" id="sideTaskPanel" role="tabpanel" hidden aria-label="子代理">
       <div class="side-task-list" id="sideTaskList"><div class="side-task-empty">Side tasks started by this chat will appear here.</div></div>
     </section>
+    <section id="sideFilesPanel" role="tabpanel" aria-label="文件" hidden></section>
     <section class="side-panel-utility" id="utilityPanelContent" role="tabpanel" hidden>
       <div class="side-panel-utility-empty"><span class="icon-slot" id="utilityPanelIcon"></span><h2 id="utilityPanelTitle"></h2><p id="utilityPanelDescription"></p><button id="utilityPanelAction" type="button" hidden></button></div>
     </section>
@@ -213,8 +217,8 @@
         <div class="summary-row"><span class="icon-slot" data-icon="folderOpen"></span><span id="summaryWorkspace">codex-cli-webui</span></div>
         <div class="summary-row"><span class="icon-slot" data-icon="gitBranch"></span><span id="summaryBranch">Local workspace</span></div>
       </section>
-      <section class="summary-section">
-        <h2 class="summary-section-title">Side tasks</h2>
+      <section class="summary-section" id="summarySideTaskSection" hidden>
+        <h2 class="summary-section-title">子代理</h2>
         <div class="summary-empty" id="summarySideTasks">No side tasks</div>
       </section>
     </div>
@@ -223,6 +227,7 @@
     <div class="bottom-panel-tabs"><button class="bottom-panel-tab active" id="bottomPanelTab" type="button">New tab</button><button class="icon-button small" id="closeBottomPanel" type="button" title="Close bottom panel"><span class="icon-slot" data-icon="x"></span></button></div>
     <div class="bottom-panel-launcher" id="bottomPanelLauncher"><button type="button" data-bottom-panel-action="terminal"><span class="icon-slot" data-icon="terminal"></span><span>Terminal</span></button><button type="button" data-bottom-panel-action="browser"><span class="icon-slot" data-icon="globe"></span><span>Browser</span></button><button type="button" data-bottom-panel-action="files"><span class="icon-slot" data-icon="folderOpen"></span><span>Files</span></button></div>
     <div class="terminal-host" id="terminalHost" data-connected="false" hidden></div>
+    <section id="bottomFilesPanel" aria-label="文件" hidden></section>
     <div class="bottom-panel-utility" id="bottomPanelUtility" hidden><span class="icon-slot" id="bottomPanelIcon"></span><div><h2 id="bottomPanelUtilityTitle"></h2><p id="bottomPanelDescription"></p></div><button id="bottomPanelAction" type="button" hidden></button></div>
   </section>
 </div>
@@ -238,49 +243,48 @@
 <dialog class="settings-dialog" id="settingsDialog" aria-labelledby="settingsTitle">
   <div class="settings-card">
     <aside class="settings-nav" aria-label="Settings">
-      <strong class="sr-only" id="settingsTitle">Settings</strong>
-      <button class="settings-nav-back" id="closeSettingsNav" type="button"><span class="icon-slot" data-icon="chevronLeft"></span><span>Back to app</span></button>
-      <label class="settings-search"><span class="icon-slot" data-icon="search"></span><input id="settingsSearch" type="search" aria-label="Search settings" placeholder="Search settings…" autocomplete="off"><button class="settings-search-clear icon-button small" id="clearSettingsSearch" type="button" aria-label="Clear settings search" hidden><span class="icon-slot" data-icon="x"></span></button></label>
+      <div class="settings-nav-heading"><strong class="sr-only" id="settingsTitle">Settings</strong><button class="settings-nav-back" id="closeSettingsNav" type="button" aria-label="Back to app"><span class="icon-slot" data-icon="chevronLeft"></span><span>Back to app</span></button></div>
+      <label class="settings-search"><span class="icon-slot" data-icon="search"></span><input id="settingsSearch" type="search" aria-label="Search settings" placeholder="Search settings…" autocomplete="off"><button class="settings-search-clear icon-button small" id="clearSettingsSearch" type="button" aria-label="Clear settings search" hidden=""><span class="icon-slot" data-icon="x"></span></button></label>
       <div class="settings-nav-scroll" id="settingsNavScroll">
-        <section class="settings-nav-group" data-settings-group="personal"><h2>Personal</h2><button type="button" class="active" data-settings-page="general-settings"><span class="icon-slot" data-icon="wrench"></span><span>General</span></button><button type="button" data-settings-page="access-settings" data-settings-available="false" hidden><span class="icon-slot" data-icon="shield"></span><span>Public access</span></button><button type="button" data-settings-page="appearance"><span class="icon-slot" data-icon="monitor"></span><span>Appearance</span></button><button type="button" data-settings-page="agent"><span class="icon-slot" data-icon="terminal"></span><span>Configuration</span></button><button type="button" data-settings-page="global-instructions"><span class="icon-slot" data-icon="file"></span><span>Global instructions</span></button><button type="button" data-settings-page="profile"><span class="icon-slot" data-icon="userRound"></span><span>Profile</span></button><button type="button" data-settings-page="keyboard-shortcuts"><span class="icon-slot" data-icon="command"></span><span>Keyboard shortcuts</span></button></section>
+        <section class="settings-nav-group" data-settings-group="personal"><h2>Personal</h2><button type="button" class="active" data-settings-page="general-settings"><span class="icon-slot" data-icon="wrench"></span><span>General</span></button><button type="button" data-settings-page="appearance"><span class="icon-slot" data-icon="monitor"></span><span>Appearance</span></button><button type="button" data-settings-page="agent"><span class="icon-slot" data-icon="terminal"></span><span>Configuration</span></button><button type="button" data-settings-page="global-instructions"><span class="icon-slot" data-icon="file"></span><span>Global instructions</span></button><button type="button" data-settings-page="profile"><span class="icon-slot" data-icon="userRound"></span><span>Profile</span></button><button type="button" data-settings-page="keyboard-shortcuts"><span class="icon-slot" data-icon="command"></span><span>Keyboard shortcuts</span></button></section><section class="settings-nav-group" data-settings-group="security"><h2>安全</h2><button type="button" data-settings-page="passkey-settings" data-local-passkey-settings="" data-settings-available="false" hidden=""><span class="icon-slot" data-icon="shield"></span><span>Passkeys</span></button><button type="button" data-settings-page="access-settings" data-local-security-settings="" data-settings-available="false" hidden=""><span class="icon-slot" data-icon="shield"></span><span>账号密码</span></button><button type="button" data-settings-page="domain-settings" data-local-security-settings="" data-settings-available="false" hidden=""><span class="icon-slot" data-icon="shield"></span><span>访问域名</span></button><button type="button" data-settings-page="otp-settings" data-local-security-settings="" data-settings-available="false" hidden=""><span class="icon-slot" data-icon="shield"></span><span>二次验证（OTP）</span></button><button type="button" data-settings-page="oidc-settings" data-local-security-settings="" data-settings-available="false" hidden=""><span class="icon-slot" data-icon="shield"></span><span>统一身份登录（OIDC）</span></button></section>
         <section class="settings-nav-group" data-settings-group="integrations"><h2>Integrations</h2><button type="button" data-settings-page="plugins-settings"><span class="icon-slot" data-icon="wrench"></span><span>Plugins</span></button><button type="button" data-settings-page="skills-settings"><span class="icon-slot" data-icon="file"></span><span>Skills</span></button><button type="button" data-settings-page="browser-use"><span class="icon-slot" data-icon="globe"></span><span>Browser</span></button></section>
         <section class="settings-nav-group" data-settings-group="coding"><h2>Coding</h2><button type="button" data-settings-page="connections"><span class="icon-slot" data-icon="monitor"></span><span>MCP servers</span></button><button type="button" data-settings-page="code-review"><span class="icon-slot" data-icon="fileDiff"></span><span>Code review</span></button></section>
-        <div class="settings-nav-empty" id="settingsNavEmpty" hidden>No results found</div>
+        <div class="settings-nav-empty" id="settingsNavEmpty" hidden="">No results found</div>
       </div>
     </aside>
     <main class="settings-content" id="settingsContent">
       <section class="settings-page" data-settings-content="general-settings">
         <header class="settings-page-heading"><button class="settings-mobile-back icon-button" id="settingsMobileBack" type="button" aria-label="Back to settings"><span class="icon-slot" data-icon="chevronLeft"></span></button><h1 id="settingsPageTitle">General</h1></header>
         <div class="settings-section-title">Permissions</div>
-        <label class="settings-row settings-toggle-row" id="settingsAutoReviewRow">
+        <div class="settings-group"><label class="settings-row settings-toggle-row" id="settingsAutoReviewRow">
           <span><strong>Auto-review</strong><small>Show “Approve for me” in the composer</small></span>
           <input id="settingsAutoReviewToggle" type="checkbox">
           <span class="settings-switch" aria-hidden="true"></span>
-        </label>
-        <label class="settings-row settings-toggle-row" id="settingsFullAccessRow">
+        </label><label class="settings-row settings-toggle-row" id="settingsFullAccessRow">
           <span><strong>Full access</strong><small>Show unrestricted access in the composer</small></span>
           <input id="settingsFullAccessToggle" type="checkbox">
           <span class="settings-switch" aria-hidden="true"></span>
-        </label>
-        <div class="settings-row"><span><strong>Selected mode</strong><small>Permission mode used for new turns</small></span><button type="button" class="settings-value-button" id="settingsPermissionValue">Ask for approval</button></div>
-        <div class="settings-row"><span><strong>Project</strong><small>Working folder used for new chats</small></span><button type="button" class="settings-value-button" id="settingsProjectValue"></button></div>
+        </label><div class="settings-row"><span><strong>Selected mode</strong><small>Permission mode used for new turns</small></span><button type="button" class="settings-value-button" id="settingsPermissionValue">Ask for approval</button></div><div class="settings-row"><span><strong>Project</strong><small>Working folder used for new chats</small></span><button type="button" class="settings-value-button" id="settingsProjectValue"></button></div></div>
+        
+        
+        
         <div class="settings-section-title settings-section-spaced">Notifications</div>
-        <label class="settings-row settings-toggle-row" id="settingsTaskNotifyRow">
+        <div class="settings-group"><label class="settings-row settings-toggle-row" id="settingsTaskNotifyRow">
           <span><strong>Task notifications</strong><small>Show a browser notification when a task completes</small></span>
           <input id="settingsTaskNotifyToggle" type="checkbox">
           <span class="settings-switch" aria-hidden="true"></span>
-        </label>
+        </label></div>
         <div class="settings-section-title settings-section-spaced">Appearance</div>
-        <label class="settings-row settings-select-row"><span><strong>Language</strong><small>Interface language</small></span><select class="settings-select" id="languageSelect"><option value="system">System default</option><option value="zh-CN">简体中文</option><option value="en">English</option></select></label>
+        <div class="settings-group"><label class="settings-row settings-select-row"><span><strong>Language</strong><small>Interface language</small></span><select class="settings-select" id="languageSelect"><option value="system">System default</option><option value="zh-CN">简体中文</option><option value="en">English</option></select></label></div>
       </section>
-      <section class="settings-page" data-settings-content="appearance" hidden>
+      <section class="settings-page" data-settings-content="appearance" hidden="">
         <header class="settings-page-heading"><button class="settings-mobile-back icon-button" type="button" aria-label="Back to settings"><span class="icon-slot" data-icon="chevronLeft"></span></button><h1>Appearance</h1></header>
-        <label class="settings-row settings-select-row"><span><strong>Theme</strong></span><select class="settings-select" id="themeSelect"><option value="system">System default</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
-        <label class="settings-row settings-select-row"><span><strong>Interface scale</strong></span><select class="settings-select" id="interfaceScaleSelect"><option value="75">75%</option><option value="80">80%</option><option value="90">90%</option><option value="100" selected>100%</option><option value="110">110%</option><option value="125">125%</option><option value="150">150%</option></select></label>
+        <div class="settings-group"><label class="settings-row settings-select-row"><span><strong>Theme</strong></span><select class="settings-select" id="themeSelect"><option value="system">System default</option><option value="light">Light</option><option value="dark">Dark</option></select></label><label class="settings-row settings-select-row"><span><strong>Interface scale</strong></span><select class="settings-select" id="interfaceScaleSelect"><option value="75">75%</option><option value="80">80%</option><option value="90">90%</option><option value="100" selected="">100%</option><option value="110">110%</option><option value="125">125%</option><option value="150">150%</option></select></label></div>
+        
       </section>
-      <section class="settings-page" data-settings-content="profile" hidden><header class="settings-page-heading"><button class="settings-mobile-back icon-button" type="button" aria-label="Back to settings"><span class="icon-slot" data-icon="chevronLeft"></span></button><h1>Profile</h1></header><div class="settings-account-identity"><span class="account-avatar account-initials" id="settingsAccountAvatar">?</span><span><strong id="settingsAccountName">Settings</strong><small id="settingsAccountMeta"></small></span></div><form id="profileForm" class="settings-access-form"><label for="profileAvatarFile"><strong>Avatar</strong><input id="profileAvatarFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" aria-describedby="profileFeedback"></label><label for="profileDisplayName"><strong>Display name</strong><input id="profileDisplayName" name="displayName" autocomplete="nickname" maxlength="160" required disabled></label><div class="settings-actions"><span id="profileFeedback" class="settings-feedback" role="status" aria-live="polite"></span><button id="saveProfile" class="integration-refresh" type="submit" disabled>Save profile</button></div></form></section>
-      <section class="settings-page" data-settings-content="keyboard-shortcuts" hidden><header class="settings-page-heading"><button class="settings-mobile-back icon-button" type="button" aria-label="Back to settings"><span class="icon-slot" data-icon="chevronLeft"></span></button><h1>Keyboard shortcuts</h1></header><div class="shortcut-row"><span>New chat</span><kbd>⌘ K</kbd></div><div class="shortcut-row"><span>Toggle sidebar</span><kbd>⌘ B</kbd></div><div class="shortcut-row"><span>Toggle bottom panel</span><kbd>⌘ J</kbd></div></section>
-      <section class="settings-page" data-settings-content="placeholder" hidden><header class="settings-page-heading"><button class="settings-mobile-back icon-button" type="button" aria-label="Back to settings"><span class="icon-slot" data-icon="chevronLeft"></span></button><h1 id="settingsPlaceholderTitle"></h1></header><small id="settingsPlaceholderDescription" hidden></small><div id="settingsPlaceholderRows"></div></section>
+      <section class="settings-page" data-settings-content="profile" hidden=""><header class="settings-page-heading"><button class="settings-mobile-back icon-button" type="button" aria-label="Back to settings"><span class="icon-slot" data-icon="chevronLeft"></span></button><h1>Profile</h1></header><div class="settings-account-identity"><span class="account-avatar account-initials" id="settingsAccountAvatar">?</span><span><strong id="settingsAccountName">Settings</strong><small id="settingsAccountMeta"></small></span></div><form id="profileForm" class="settings-access-form"><label for="profileAvatarFile"><strong>Avatar</strong><input id="profileAvatarFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" aria-describedby="profileFeedback"></label><label for="profileDisplayName"><strong>Display name</strong><input id="profileDisplayName" name="displayName" autocomplete="nickname" maxlength="160" required="" disabled=""></label><div class="settings-actions"><span id="profileFeedback" class="settings-feedback" role="status" aria-live="polite"></span></div></form></section>
+      <section class="settings-page" data-settings-content="keyboard-shortcuts" hidden=""><header class="settings-page-heading"><button class="settings-mobile-back icon-button" type="button" aria-label="Back to settings"><span class="icon-slot" data-icon="chevronLeft"></span></button><h1>Keyboard shortcuts</h1></header><div class="settings-group"><div class="shortcut-row"><span>New chat</span><kbd>⌘ K</kbd></div><div class="shortcut-row"><span>Toggle sidebar</span><kbd>⌘ B</kbd></div><div class="shortcut-row"><span>Toggle bottom panel</span><kbd>⌘ J</kbd></div></div></section>
+      <section class="settings-page" data-settings-content="placeholder" hidden=""><header class="settings-page-heading"><button class="settings-mobile-back icon-button" type="button" aria-label="Back to settings"><span class="icon-slot" data-icon="chevronLeft"></span></button><h1 id="settingsPlaceholderTitle"></h1></header><small id="settingsPlaceholderDescription" hidden=""></small><div id="settingsPlaceholderRows"></div></section>
     </main>
   </div>
 </dialog>
@@ -302,7 +306,7 @@
       <a class="image-viewer-original" id="imageViewerOriginal" target="_blank" rel="noopener noreferrer">Open original</a>
       <button class="icon-button" id="closeImageViewer" type="button" aria-label="Close image viewer"><span class="icon-slot" data-icon="x"></span></button>
     </div>
-    <div class="image-viewer-stage">
+    <div class="image-viewer-stage" tabindex="0" role="region" aria-label="图片查看：滚轮缩放，拖动移动；加减键缩放，方向键移动，0 键还原">
       <img id="imageViewerImage" alt="">
       <div class="image-viewer-error" id="imageViewerError" hidden>Image could not be loaded.</div>
     </div>

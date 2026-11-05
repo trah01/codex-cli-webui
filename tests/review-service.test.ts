@@ -3,7 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vitest"
 import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { applyReviewPatch } from "../review-service.js";
+import { applyReviewPatch } from "../server/review-service.js";
 
 const allowedRoot = tmpdir();
 const fixture = join(allowedRoot, `codex-webui-review-fixture-${process.pid}`);

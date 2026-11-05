@@ -2,15 +2,15 @@ import { expect, test } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { boundDomainRequest, loadBoundDomain, normalizeBoundDomain, saveBoundDomain } from '../access-policy.js';
-import { createStoredPassword, isAuthorizedHttpRequest, isLocalAuthManagementRequest, isSameOrigin, storedPasswordSessionSecret } from '../server-security.js';
+import { boundDomainRequest, loadBoundDomain, normalizeBoundDomain, saveBoundDomain } from '../server/access-policy.js';
+import { createStoredPassword, isAuthorizedHttpRequest, isLocalAuthManagementRequest, isSameOrigin, storedPasswordSessionSecret } from '../server/server-security.js';
 
 const request = (host: string, headers = {}, address = '192.168.1.2') => ({ socket: { remoteAddress: address }, headers: { host, ...headers } });
 const domain = 'codex.example.com';
 
 test('only direct 127.0.0.1 and the bound domain can access HTTP or upgrade authentication', () => {
   expect(boundDomainRequest(request('127.0.0.1:8899', {}, '127.0.0.1'), '')).not.toBeNull();
-  for (const host of ['localhost:8899', '[::1]:8899', '192.168.1.2:8899', 'other.example.com', '127.1:8899']) {
+  for (const host of ['[::1]:8899', '192.168.1.2:8899', 'other.example.com', '127.1:8899']) {
     expect(boundDomainRequest(request(host, {}, '127.0.0.1'), domain)).toBeNull();
   }
   expect(boundDomainRequest(request(domain), '')).toBeNull();
@@ -57,4 +57,16 @@ test('validates and persists domain changes independently of credentials', () =>
     saveBoundDomain(path, '');
     expect(loadBoundDomain(path)).toBe('');
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('cross-site OIDC returns can reach loopback pages without gaining settings access', () => {
+  for (const path of ['/api/auth/oidc/callback', '/settings/oidc-settings']) {
+    const local = { ...request('127.0.0.1:8899', { 'sec-fetch-site': 'cross-site' }, '127.0.0.1'), url: path };
+    expect(boundDomainRequest(local, domain)).toBe(local);
+    expect(isLocalAuthManagementRequest(local)).toBe(false);
+  }
+  const foreignOrigin = request('127.0.0.1:8899', { origin: 'https://identity.example.com' }, '127.0.0.1');
+  expect(boundDomainRequest(foreignOrigin, domain)).toBe(foreignOrigin);
+  expect(isLocalAuthManagementRequest(foreignOrigin)).toBe(false);
+  expect(boundDomainRequest(request('127.0.0.1:8899', { 'x-forwarded-for': '192.168.1.2', 'sec-fetch-site': 'cross-site' }, '127.0.0.1'), domain)).toBeNull();
 });

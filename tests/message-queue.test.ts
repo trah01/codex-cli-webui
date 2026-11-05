@@ -2,7 +2,7 @@ import { afterEach, expect, test } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createMessageQueue } from '../message-queue.js';
+import { createMessageQueue } from '../server/message-queue.js';
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });

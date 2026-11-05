@@ -1,4 +1,10 @@
-import { authenticationConfig, createAuthentication, authorizeAuthenticationRequest } from './authentication.js';
+import { createPasskeyService } from './passkey-service.js';
+import { createPasskeyRoutes, passkeyRequestContext } from './passkey-routes.js';
+import { createTaskThreadReader, prepareThreadMessage } from './task-context.js';
+import { createSubagentService } from './subagent-service.js';
+import { oidcCallbackAddress, loadAuthenticationSettings, validateAuthenticationSettings, updateAuthenticationSettings, publicAuthenticationSettings, saveAuthenticationSettings } from './authentication-store.js';
+import { Secret, TOTP } from 'otpauth';
+import { authenticationRequirements, createAuthentication, authorizeAuthenticationRequest } from './authentication.js';
 import { mergeTurnSources } from './session-items.js';
 import { createSessionRequestHandlers } from './session-request-service.js';
 import { SessionService } from './session-service.js';
@@ -13,19 +19,19 @@ import { WebSocketServer, WebSocket } from "ws";
 import { defaultBrowseRoots, isDirectory, listFolders, resolveBrowsePath } from "./folder-service.js";
 import { applyReviewPatch } from "./review-service.js";
 import { ReviewDiffStore, parseReviewPatchRequest } from "./review-state.js";
-import { unifiedDiffFromFileChanges } from "./public/codex-surfaces.js";
-import { rpcErrorPayload } from "./public/bridge-errors.js";
+import { unifiedDiffFromFileChanges } from "../public/codex-surfaces.js";
+import { rpcErrorPayload } from "../public/bridge-errors.js";
 import { createTerminalSession, normalizeTerminalResize, resolveTerminalCwd } from "./terminal-service.js";
 import { readWorkspaceContext } from "./workspace-context.js";
 import { searchWorkspaceFiles } from "./file-search.js";
-import { resolveLocalFile } from "./file-service.js";
+import { resolveLocalFile, listLocalFiles, readLocalText } from "./file-service.js";
 import { resolveLocalImage } from "./image-service.js";
 import { LiveSessionStore } from "./live-session-service.js";
 import { createSettingsService } from "./settings-service.js";
 import {
   createStoredPassword,
   isAllowedBrowserRpcMethod,
-  isLocalAuthManagementRequest,
+  isDirectLocalRequest, isLocalAuthManagementRequest,
   isRequestAuthorized,
   isSameOrigin,
   resolvePublicAsset,
@@ -36,14 +42,13 @@ import {
 } from "./server-security.js";
 import { loadStoredPassword, passwordStorePath, saveStoredPassword, replaceStoredPassword, type StoredPassword } from "./password-store.js";
 import { boundDomainRequest, loadBoundDomain, normalizeBoundDomain, saveBoundDomain } from "./access-policy.js";
-import { validateImageInputs, TURN_REQUEST_MAX_BYTES } from "./public/composer-input.js";
+import { validateImageInputs, TURN_REQUEST_MAX_BYTES } from "../public/composer-input.js";
 import { interruptThread } from "./turn-control.js";
 import { createMessageQueue } from "./message-queue.js";
 import { createCodexConnection } from "./codex-connection.js";
 import {
   createAccountIdentityLoader,
   fetchProfileAvatar,
-  isLocalAccountRequest,
   resolveAccountIdentity,
   toPublicAccountIdentity,
 } from "./profile-service.js";
@@ -55,18 +60,19 @@ const port = Number(process.env.PORT || 8899);
 const accessToken = process.env.CODEX_WEBUI_ACCESS_TOKEN || null;
 const environmentPassword = process.env.CODEX_WEBUI_PASSWORD || null;
 const managedPasswordPath = passwordStorePath();
+const passkeys = createPasskeyService({ path: `${managedPasswordPath}.passkeys.json` });
 const profileStorePath = `${managedPasswordPath}.profile.json`;
 const domainStorePath = `${managedPasswordPath}.access.json`;
 let boundDomain = loadBoundDomain(domainStorePath);
 let managedPassword: StoredPassword | null = environmentPassword || accessToken ? null : loadStoredPassword(managedPasswordPath);
 let authSecret = environmentPassword || accessToken || storedPasswordSessionSecret(managedPassword);
-const authenticationOptions = authenticationConfig();
-const authentication = createAuthentication(authenticationOptions);
+const securityStorePath = `${managedPasswordPath}.security.json`;
+let securitySettings = loadAuthenticationSettings(securityStorePath);
+let { config: authenticationOptions, origin: publicOrigin } = validateAuthenticationSettings(securitySettings, { domain: boundDomain, passwordConfigured: Boolean(authSecret) });
+let authentication = createAuthentication(authenticationOptions);
 if (authenticationOptions.totp && !authSecret && authenticationOptions.mode !== 'oidc') throw new Error('Configure a password before enabling OTP');
 if (authenticationOptions.mode === 'both' && !authSecret) throw new Error('Configure a password before enabling both authentication methods');
 if (authenticationOptions.mode !== 'password' && new URL(authenticationOptions.provider.redirectUri).hostname !== boundDomain) throw new Error('Bind the OIDC callback domain locally before enabling OIDC');
-const publicOrigin = authenticationOptions.provider && authenticationOptions.mode !== 'password' ? new URL(authenticationOptions.provider.redirectUri).origin : process.env.CODEX_WEBUI_PUBLIC_ORIGIN || null;
-if (publicOrigin && (new URL(publicOrigin).protocol !== 'https:' || new URL(publicOrigin).origin !== publicOrigin)) throw new Error('CODEX_WEBUI_PUBLIC_ORIGIN must be an HTTPS origin without a trailing slash');
 let passwordSetupInProgress = false;
 const localhostOnly = host === "127.0.0.1" || host === "::1" || host === "localhost";
 const moduleDir = fileURLToPath(new URL(".", import.meta.url));
@@ -109,6 +115,8 @@ const messageQueue = createMessageQueue({
   storePath: `${managedPasswordPath}.queue.json`, request,
   canSend: () => connected && !shuttingDown, notify: broadcast,
 });
+const loadNativeThread = createTaskThreadReader({ request, loadLegacy: async id => (await request("thread/read", { threadId: id, includeTurns: true })).thread });
+const subagentService = createSubagentService({ request, loadThread: loadSessionThread, enqueue: params => messageQueue.enqueue(params) });
 let httpClosed = false;
 const accountLoader = createAccountIdentityLoader(async (refresh) => {
   const account = await request("account/read", { refreshToken: refresh });
@@ -271,7 +279,7 @@ async function readLiveThread(threadId: unknown) {
 }
 
 async function loadSessionThread(threadId: string) {
-  const result = await request("thread/read", { threadId, includeTurns: true });
+  const result = { thread: await loadNativeThread(threadId) };
   recordThreadPathsFromRpc(result);
   recordReviewDiffsFromRpc("thread/read", { threadId }, result);
   const thread = result.thread;
@@ -323,8 +331,10 @@ async function dispatchBrowserMessage(message: any, channel: { send: (message: a
         ? { requests: pendingRequests.list(params.threadId) }
         : message.method === "host/request/respond"
         ? answerBrowserRequest(params)
+        : message.method.startsWith("host/subagents/")
+        ? await subagentService(message.method, params)
         : message.method === "host/thread/send"
-        ? messageQueue.enqueue(params)
+        ? messageQueue.enqueue(await prepareThreadMessage(params, loadSessionThread))
         : message.method === "host/thread/queue/list"
         ? { messages: messageQueue.list(params.threadId) }
         : message.method === "host/thread/queue/cancel"
@@ -418,20 +428,23 @@ function validBrowserPassword(req: IncomingMessage, submittedPassword: string, u
 }
 
 function authConfigured() { return Boolean(authSecret || (authenticationOptions.provider && authenticationOptions.mode !== 'password')); }
-function secureCookie(req: IncomingMessage) { return Boolean((req.socket as any).encrypted || (publicOrigin && !isLocalAuthManagementRequest(req))); }
+function secureCookie(req: IncomingMessage) {
+  return Boolean((req.socket as any).encrypted || (publicOrigin?.startsWith('https:') && !isLocalAuthManagementRequest(req)));
+}
 function sameOriginRequest(req: IncomingMessage) {
   const accessRequest = boundDomainRequest(req, boundDomain);
   if (!accessRequest || req.headers['sec-fetch-site'] === 'cross-site') return false;
-  if (req.headers.origin && publicOrigin && req.headers.origin !== publicOrigin && !isLocalAuthManagementRequest(req)) return false;
+  if (authenticationOptions.mode === 'password' && req.headers.origin && publicOrigin && req.headers.origin !== publicOrigin && !isLocalAuthManagementRequest(req)) return false;
   return isSameOrigin(req.headers.origin, accessRequest.headers.host);
 }
 function authorizedRequest(req: IncomingMessage) {
   if (!sameOriginRequest(req)) return false;
+  if (!authenticationRequirements(req, authenticationOptions, securitySettings.localAuthRequired).loginRequired) return true;
   if (!authConfigured()) return false;
   return authorizeAuthenticationRequest(boundDomainRequest(req, boundDomain), authentication, authenticationOptions, accessToken);
 }
 function canManageAuthentication(req: IncomingMessage) {
-  return isLocalAuthManagementRequest(req) && (!authConfigured() || authorizedRequest(req));
+  return isLocalAuthManagementRequest(req) && (!browserPasswordConfigured() || !authConfigured() || authorizedRequest(req));
 }
 
 function sendAuthError(res: ServerResponse, status: number, error: string, extraHeaders: Record<string, string> = {}) {
@@ -444,14 +457,14 @@ function sendAuthError(res: ServerResponse, status: number, error: string, extra
   res.end(JSON.stringify({ error }));
 }
 
-function issueBrowserSession(req: IncomingMessage, res: ServerResponse) {
+function issueBrowserSession(req: IncomingMessage, res: ServerResponse, verified = false, extraCookie?: string, forceSecure = false) {
   let cookie: string;
-  try { cookie = authentication.issue(secureCookie(req)); }
+  try { cookie = authentication.issue(forceSecure || secureCookie(req), { verified }); }
   catch { sendAuthError(res, 503, '登录会话已满，请稍后重试。'); return; }
   res.writeHead(200, {
     "content-type": "application/json; charset=utf-8",
     "cache-control": "no-store",
-    "set-cookie": cookie,
+    "set-cookie": extraCookie ? [cookie, extraCookie] : cookie,
     "x-content-type-options": "nosniff",
   });
   res.end(JSON.stringify({ ok: true }));
@@ -466,6 +479,16 @@ const mime: Record<string, string> = {
   ".json": "application/json; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon",
 };
 
+const handlePasskeys = createPasskeyRoutes({
+  passkeys, getState: () => ({ authentication, domain: boundDomain, publicOrigin, configured: authConfigured() }),
+  authorizedRequest, sameOriginRequest, readJsonBody, sendAuthError, issueBrowserSession,
+  revokeConnections: () => {
+    for (const client of clients) client.close(1008, 'Passkey removed');
+    for (const client of terminalSessions.keys()) client.close(1008, 'Passkey removed');
+    for (const stream of sseClients) stream.end();
+  },
+});
+
 const server = createServer(async (req, res) => {
   res.setHeader('x-content-type-options', 'nosniff');
   res.setHeader('x-frame-options', 'DENY');
@@ -473,7 +496,7 @@ const server = createServer(async (req, res) => {
   res.setHeader('content-security-policy', "frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'");
   res.setHeader('cache-control', 'no-store');
   if (!boundDomainRequest(req, boundDomain)) {
-    sendAuthError(res, 403, "Access is only allowed through 127.0.0.1 or the bound domain");
+    sendAuthError(res, 403, "Access is only allowed through direct 127.0.0.1, localhost or the bound domain");
     return;
   }
   let url: URL;
@@ -484,25 +507,62 @@ const server = createServer(async (req, res) => {
     return;
   }
   const appRoute = req.method === "GET" && (url.pathname === "/" || /^\/settings(?:\/[^/]+)?\/?$/.test(url.pathname));
-  const loginAssets = new Set(["/", "/index.html", "/style.css", "/favicon.svg", "/auth-bootstrap.js", "/i18n.js", "/codex-brand.js"]);
+  const loginAssets = new Set(["/", "/index.html", "/style.css", "/favicon.svg", "/auth-bootstrap.js", "/passkey-client.js", "/i18n.js", "/codex-brand.js"]);
   if (url.pathname === "/api/auth/status") {
     const authenticated = authorizedRequest(req);
+    const passkeyContext = passkeyRequestContext(req, { domain: boundDomain, publicOrigin });
+    const requirements = authenticationRequirements(req, authenticationOptions, securitySettings.localAuthRequired);
     res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" });
     res.end(JSON.stringify({
-      setupRequired: passwordSetupRequired() && !authenticated,
-      passwordRequired: authenticationOptions.mode !== 'oidc' && browserPasswordConfigured(),
-      otpRequired: Boolean(authenticationOptions.totp) && authenticationOptions.mode !== 'oidc',
-      oidcEnabled: Boolean(authenticationOptions.provider) && authenticationOptions.mode !== 'password',
-      passwordEnabled: authenticationOptions.mode !== 'oidc',
+      setupRequired: (requirements.local ? !browserPasswordConfigured() : passwordSetupRequired()) && !authenticated,
+      passwordRequired: requirements.passwordEnabled && browserPasswordConfigured(),
+      loginRequired: requirements.loginRequired,
+      otpRequired: requirements.otpRequired,
+      oidcEnabled: requirements.oidcEnabled,
+      passwordEnabled: requirements.passwordEnabled,
       authenticated,
+      passkeyEnabled: Boolean(authConfigured() && passkeyContext && passkeys.has(passkeyContext.rpID)),
+      passkeyOrigin: passkeyContext?.origin || null,
+      canManagePasskeys: isLocalAuthManagementRequest(req),
       canManageCredentials: canManageAuthentication(req),
       usernameRequired: Boolean(managedPassword?.username),
     }));
     return;
   }
+  if (await handlePasskeys(req, res, url)) return;
+  if (url.pathname === '/api/auth/security' || url.pathname === '/api/auth/otp-secret') {
+    if (!canManageAuthentication(req)) { sendAuthError(res, 403, '仅允许在服务器本机通过 127.0.0.1 或 localhost 配置认证。'); return; }
+    if (url.pathname === '/api/auth/otp-secret') {
+      if (req.method !== 'POST') { sendAuthError(res, 405, 'Method not allowed'); return; }
+      const secret = new Secret({ size: 20 });
+      const totp = new TOTP({ issuer: 'Codex WebUI', label: managedPassword?.username || 'admin', algorithm: 'SHA1', digits: 6, period: 30, secret });
+      res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ secret: secret.base32, uri: totp.toString() })); return;
+    }
+    if (req.method === 'GET') {
+      res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(publicAuthenticationSettings({ ...securitySettings, redirectUri: oidcCallbackAddress(boundDomain, securitySettings) }))); return;
+    }
+    if (req.method !== 'POST') { sendAuthError(res, 405, 'Method not allowed'); return; }
+    try {
+      const payload = await readJsonBody(req, 32768);
+      const next = updateAuthenticationSettings(securitySettings, { ...payload, redirectUri: oidcCallbackAddress(boundDomain, securitySettings) });
+      const validated = validateAuthenticationSettings(next, { domain: boundDomain, passwordConfigured: Boolean(authSecret) });
+      const nextAuthentication = createAuthentication(validated.config);
+      if (next.otpSecret && next.otpSecret !== securitySettings.otpSecret && !nextAuthentication.verifyOtp(payload.otpCode)) {
+        sendAuthError(res, 400, '请填写验证器当前的六位验证码，确认绑定成功。'); return;
+      }
+      saveAuthenticationSettings(securityStorePath, next);
+      authentication.revokeAll(); securitySettings = next; authenticationOptions = validated.config; publicOrigin = validated.origin;
+      authentication = nextAuthentication;
+      for (const client of clients) client.close(1008, 'Authentication settings changed');
+      for (const client of terminalSessions.keys()) client.close(1008, 'Authentication settings changed');
+      for (const stream of sseClients) stream.end();
+      issueBrowserSession(req, res);
+    } catch { sendAuthError(res, 400, '无法保存认证配置，请检查密码、域名、OIDC 必填项和密钥格式。'); }
+    return;
+  }
   if (url.pathname === "/api/auth/domain") {
     if (!canManageAuthentication(req)) {
-      sendAuthError(res, 403, "Account settings are only available through http://127.0.0.1");
+      sendAuthError(res, 403, "Account settings are only available through direct 127.0.0.1 or localhost access");
       return;
     }
     if (req.method === "GET") {
@@ -514,9 +574,18 @@ const server = createServer(async (req, res) => {
     let domain: string;
     try { domain = normalizeBoundDomain((await readJsonBody(req, 4096)).domain); }
     catch { sendAuthError(res, 400, "Enter a domain without a protocol, port or path"); return; }
-    try { saveBoundDomain(domainStorePath, domain); }
-    catch { sendAuthError(res, 500, "Unable to save domain binding"); return; }
-    boundDomain = domain;
+    if (!domain && authenticationOptions.mode !== 'password') { sendAuthError(res, 400, '请先关闭统一身份登录，再清除域名。'); return; }
+    const next = { ...securitySettings, publicOrigin: '', redirectUri: oidcCallbackAddress(domain, securitySettings) };
+    try {
+      const validated = validateAuthenticationSettings(next, { domain, passwordConfigured: Boolean(authSecret) });
+      saveBoundDomain(domainStorePath, domain);
+      try { saveAuthenticationSettings(securityStorePath, next); }
+      catch (error) { saveBoundDomain(domainStorePath, boundDomain); throw error; }
+      boundDomain = domain; securitySettings = next;
+      authentication.revokeAll(); authenticationOptions = validated.config; publicOrigin = validated.origin;
+      authentication = createAuthentication(authenticationOptions);
+      res.setHeader('set-cookie', authentication.issue(false));
+    } catch { sendAuthError(res, 500, '无法保存域名绑定。'); return; }
     for (const client of clients) client.close(1008, "Domain binding changed");
     for (const client of terminalSessions.keys()) client.close(1008, "Domain binding changed");
     for (const stream of sseClients) stream.end();
@@ -526,12 +595,12 @@ const server = createServer(async (req, res) => {
   }
   if (url.pathname === "/api/auth/setup" || url.pathname === "/api/auth/credentials") {
     if (!canManageAuthentication(req)) {
-      sendAuthError(res, 403, "Account settings are only available through http://127.0.0.1");
+      sendAuthError(res, 403, "Account settings are only available through direct 127.0.0.1 or localhost access");
       return;
     }
     if (req.method === "GET" && url.pathname === "/api/auth/credentials") {
       res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
-      res.end(JSON.stringify({ configured: browserPasswordConfigured(), username: managedPassword?.username || "codex", editable: !environmentPassword && !accessToken }));
+      res.end(JSON.stringify({ configured: browserPasswordConfigured(), username: managedPassword?.username || "codex", localAuthRequired: securitySettings.localAuthRequired, editable: !environmentPassword && !accessToken }));
       return;
     }
     if (req.method !== "POST") {
@@ -567,7 +636,7 @@ const server = createServer(async (req, res) => {
       managedPassword = credential;
       authSecret = storedPasswordSessionSecret(credential);
       authentication.revokeAll();
-      issueBrowserSession(req, res);
+      issueBrowserSession(req, res, true);
       // Existing remote connections must authenticate again after credential rotation.
       for (const client of clients) client.close(1008, "Account settings changed");
       for (const client of terminalSessions.keys()) client.close(1008, "Account settings changed");
@@ -579,22 +648,26 @@ const server = createServer(async (req, res) => {
     return;
   }
   if (url.pathname === '/api/auth/oidc/start' || url.pathname === '/api/auth/oidc/callback') {
-    if (req.method !== 'GET' || !authenticationOptions.provider || authenticationOptions.mode === 'password') {
+    if (req.method !== 'GET' || isDirectLocalRequest(req) || !authenticationOptions.provider || authenticationOptions.mode === 'password') {
       sendAuthError(res, 404, 'Not found'); return;
     }
     if (!authentication.allowAttempt(req.socket.remoteAddress)) { sendAuthError(res, 429, 'Too many login attempts. Try again in five minutes.', { 'retry-after': '300' }); return; }
+    const loginAuthentication = authentication;
     try {
       if (url.pathname.endsWith('/start')) {
         if (!sameOriginRequest(req)) { sendAuthError(res, 403, 'Invalid request origin'); return; }
-        const flow = await authentication.startOidc();
+        const flow = await loginAuthentication.startOidc(oidcCallbackAddress(boundDomain, securitySettings));
+        if (authentication !== loginAuthentication) throw new Error("Authentication settings changed");
         res.writeHead(302, { location: flow.url, 'set-cookie': flow.cookie }); res.end();
       } else {
-        const expected = new URL(authenticationOptions.provider.redirectUri);
-        const accessRequest = boundDomainRequest(req, boundDomain);
-        if (accessRequest.headers.host !== expected.host) throw new Error('Callback host mismatch');
+        const callback = oidcCallbackAddress(boundDomain, securitySettings);
+        if (!callback) throw new Error('Callback host mismatch');
+        const expected = new URL(callback);
+        if (boundDomainRequest(req, boundDomain)?.headers.host !== expected.host) throw new Error('Callback host mismatch');
         expected.search = url.search;
-        await authentication.finishOidc(expected, req);
-        res.writeHead(303, { location: '/', 'set-cookie': [authentication.issue(true), 'codex_webui_oidc=; Path=/api/auth/oidc; HttpOnly; Secure; SameSite=Lax; Max-Age=0'] }); res.end();
+        await loginAuthentication.finishOidc(expected, req);
+        if (authentication !== loginAuthentication) throw new Error("Authentication settings changed");
+        res.writeHead(303, { location: '/', 'referrer-policy': 'no-referrer', 'set-cookie': [authentication.issue(expected.protocol === 'https:', { verified: true }), `codex_webui_oidc=; Path=/api/auth/oidc; HttpOnly;${expected.protocol === 'https:' ? ' Secure;' : ''} SameSite=Lax; Max-Age=0`] }); res.end();
       }
     } catch { sendAuthError(res, 401, '身份认证失败，请重新登录或联系管理员检查配置。'); }
     return;
@@ -610,7 +683,7 @@ const server = createServer(async (req, res) => {
       sendAuthError(res, 405, "Method not allowed", { allow: "POST" });
       return;
     }
-    if (authenticationOptions.mode === 'oidc') { sendAuthError(res, 403, '请使用统一身份登录。'); return; }
+    if (authenticationOptions.mode === 'oidc' && !isLocalAuthManagementRequest(req)) { sendAuthError(res, 403, '请使用统一身份登录。'); return; }
     if (!sameOriginRequest(req)) { sendAuthError(res, 403, 'Invalid request origin'); return; }
     if (!authentication.allowAttempt(req.socket.remoteAddress)) { sendAuthError(res, 429, '登录尝试过多，请五分钟后重试。', { 'retry-after': '300' }); return; }
     let payload: any;
@@ -620,11 +693,11 @@ const server = createServer(async (req, res) => {
       return;
     }
     const submittedPassword = typeof payload?.password === "string" ? payload.password : "";
-    if (submittedPassword.length > 256 || !validBrowserPassword(req, submittedPassword, typeof payload?.username === "string" ? payload.username : undefined) || !authentication.verifyOtp(payload?.otp)) {
+    if (submittedPassword.length > 256 || !validBrowserPassword(req, submittedPassword, typeof payload?.username === "string" ? payload.username : undefined) || (authenticationRequirements(req, authenticationOptions, securitySettings.localAuthRequired).otpRequired && !authentication.verifyOtp(payload?.otp))) {
       sendAuthError(res, 401, "账号、密码或验证码不正确。");
       return;
     }
-    issueBrowserSession(req, res);
+    issueBrowserSession(req, res, true);
     return;
   }
   if (!authorizedRequest(req)) {
@@ -712,6 +785,25 @@ const server = createServer(async (req, res) => {
     }
     return;
   }
+  if (url.pathname === "/api/files/list" || url.pathname === "/api/files/preview") {
+    if (req.method !== "GET") {
+      res.writeHead(405, { allow: "GET", "content-type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ error: "Method not allowed" }));
+      return;
+    }
+    try {
+      const options = { cwd: url.searchParams.get("cwd") || defaultCwd, home: homeDir, allowedRoots: fileRoots };
+      const result = url.pathname.endsWith("/list")
+        ? await listLocalFiles(url.searchParams.get("path") || options.cwd, options)
+        : await readLocalText(url.searchParams.get("path"), options);
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" });
+      res.end(JSON.stringify(result));
+    } catch {
+      res.writeHead(400, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+      res.end(JSON.stringify({ error: url.pathname.endsWith("/list") ? "无法读取目录，请检查路径和访问权限" : "无法预览此文件：仅支持 2 MB 以内的 UTF-8 / UTF-16 文本，请下载后查看" }));
+    }
+    return;
+  }
   if (url.pathname === "/api/files/search") {
     try {
       const cwd = url.searchParams.get("cwd") || defaultCwd;
@@ -783,8 +875,7 @@ const server = createServer(async (req, res) => {
     return;
   }
   if (url.pathname === "/api/account" || url.pathname === "/api/account/avatar") {
-    const proxied = Boolean(req.headers["x-forwarded-for"] || req.headers.forwarded || req.headers["x-real-ip"]);
-    if (proxied || !isLocalAccountRequest(req.socket.remoteAddress, req.headers.host, req.headers["sec-fetch-site"] as string | undefined)) {
+    if (req.method !== "GET" && !canManageAuthentication(req)) {
       res.writeHead(403, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
       res.end(JSON.stringify({ error: "Account identity is available only on localhost" }));
       return;
@@ -820,7 +911,7 @@ const server = createServer(async (req, res) => {
       if (editing) await saveProfileName(profileStorePath, displayName, uploadedAvatar);
       if (url.pathname === "/api/account") {
         res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" });
-        res.end(JSON.stringify(await withProfileName(toPublicAccountIdentity(account), profileStorePath)));
+        res.end(JSON.stringify(await withProfileName(toPublicAccountIdentity({ ...account, ...(account.type === "apiKey" ? { displayName: managedPassword?.username || "个人资料" } : {}) }), profileStorePath)));
         return;
       }
       if (!account.imageUrl) {

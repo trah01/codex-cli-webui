@@ -1,284 +1,78 @@
 # codex-cli-webui
 
-<p align="center">
-  <strong>A local, LAN-accessible WebUI for the real Codex app-server.</strong>
-</p>
+通过浏览器使用 Codex 的个人开发工作台，集中处理项目会话、代码修改、执行审批和终端操作，支持桌面与移动端。
 
-<p align="center">
-  <a href="./README-zh.md">简体中文</a> ·
-  <a href="./CONTRIBUTING.md">Contributing</a> ·
-  <a href="./SECURITY.md">Security</a>
-</p>
+[English](./docs/en/README.md)
 
-<p align="center">
-</p>
+灵感来源于 [lezi-fun/codex-webui](https://github.com/lezi-fun/codex-webui)，并在此基础上进行了大量优化。
 
-> [!IMPORTANT]
-> This is an **unofficial community project**. It is not affiliated with, endorsed by, or maintained by OpenAI. OpenAI and Codex are trademarks of their respective owners.
+> [!CAUTION]
+> **禁止将本项目直接对公网开放。即使已启用密码、动态验证码或统一身份登录，直接开放到公网仍然非常危险。**
+>
+> 本项目能够调用终端、执行命令、读取和修改文件，并使用运行环境中的 Codex 权限与凭据。登录保护不能替代网络隔离，也不能把它变成适合公网使用的服务。不要将服务端口、普通反向代理或内网穿透入口直接对公网开放；启用 HTTPS 同样不能替代访问控制与网络隔离。
+>
+> 远程使用时，通过堡垒机的安全网关反向代理访问，WebUI 后端仅允许安全网关连接。
 
-codex-cli-webui connects to the existing local Codex daemon when available, otherwise starts `codex app-server --stdio`, and exposes the local Codex experience through a responsive browser interface. It keeps real threads, models, streaming responses, tool activity, approval requests, diffs, and token usage instead of simulating them in a static frontend.
 
-![codex-cli-webui desktop screenshot](./docs/assets/overview.png)
+## 功能
 
-Based on [lezi-fun/codex-webui](https://github.com/lezi-fun/codex-webui), originally authored by lezi-fun. Original copyright and MIT license notices are retained.
+- **会话与项目**：切换项目目录、管理历史会话、接收流式回答，查看模型、推理强度与上下文用量。
+- **持续执行**：展示工具调用和任务状态；会话被其他 Codex 客户端占用时，消息进入队列，支持取消和重试。
+- **审批与问答**：处理命令执行、文件修改和权限请求，显示请求的提交与处理状态。
+- **代码审查**：查看统一或左右对照的代码差异，支持换行、展开，以及指定仓库范围内的撤销和重新应用。
+- **工作面板**：集成交互式终端、文件浏览与预览、文件位置跳转、网页入口和子代理会话管理。
+- **消息与草稿**：支持 Markdown、表格、代码块、公式和图片附件，保存输入草稿与会话记录。
+- **设置与界面**：提供中文和英文、浅色和深色主题、界面缩放、分组设置及自动保存，适配桌面与移动端。
+- **访问控制**：支持账号密码、通行密钥（Passkey）、动态验证码（OTP）和统一身份登录（OIDC）。这些功能用于受控环境内的访问保护，不代表允许公网开放。
 
-## Highlights
+本项目连接真实的 `codex app-server`。默认优先连接本机已有的共享后台；无法使用时启动独立后台。部分能力取决于本机 Codex 版本、账号和运行环境。
 
-- Shared local Codex daemon connection or a standalone `codex app-server --stdio` bridge
-- Real model catalog, reasoning effort options, threads, and streaming turns
-- Command, file-change, network, and permission approval surfaces
-- Approval scopes such as **Allow once**, **Allow similar commands**, and session-level approval
-- Tool activity states driven by real item/turn notifications
-- Unified and split diff review, word wrap, expand/collapse, Undo, and Reapply
-- Safe Markdown, GFM, fenced code blocks, links, and KaTeX rendering
-- Project-folder picker with restricted filesystem browsing
-- Codex-style sidebar account identity with display name, same-origin avatar fallback, and plan
-- Codex Desktop-style 46px header with separate Bottom Panel, Summary, and Task Side Panel controls; the Bottom Panel opens its native-style New tab launcher
-- Real Bottom Panel PTY terminal powered by xterm.js, with 256-color ANSI output, terminal resize, and interactive Vim/control-key support
-- Collapsed-by-default Summary panel matching the native Environment, Scheduled, Computer Use, Plan, Side tasks, and Sources sections; app-server data is shown when available and native-store-only sections use explicit unavailable or empty states instead of fabricated content
-- Collapsed-by-default Task Side Panel mirroring the native New tab launcher: Review opens the real diff, Files links to the restricted project picker, and its native-bridge-only Terminal, Browser, and Side task entries show an explicit availability notice instead of a simulated tool
-- Light and dark surfaces driven by shared Codex-style color tokens, including the monochrome transparent Codex Knot
-- Windowed long conversations instead of rendering thousands of turns at once
-- Responsive desktop and mobile layouts with full-screen Summary and Task Side Panel drawers on phones
-- Localhost-only by default; authenticated LAN access is opt-in
+## 环境要求
 
-## Requirements
+- Node.js **24.22.1 及以上的 24.x**，或 **26.12.1 及以上的 26.x**，以及 npm。
+- 已安装并完成登录的 [Codex CLI](https://www.npmjs.com/package/@openai/codex)。
+- Git；代码审查中的撤销和重新应用需要使用 Git。
+- 推荐 macOS 或 Linux，Windows 尚未完整验证。
 
-- Node.js 24.22.1+ (24.x) or 26.12.1+ (26.x), and npm
-- [OpenAI Codex CLI](https://www.npmjs.com/package/@openai/codex), installed and authenticated
-- Git, for Review Undo/Reapply
-- macOS or Linux recommended; Windows has not been fully tested
-
-Install Codex CLI if needed:
+尚未安装 Codex CLI 时，先执行：
 
 ```bash
 npm install -g @openai/codex
 codex
 ```
 
-Complete the Codex sign-in flow before starting this project.
+按提示完成登录，再启动 WebUI。
 
-## Quick start
+## 本机启动
 
-```bash
-cd codex-cli-webui
-npm install
-npm run start
-```
-
-Open:
-
-```text
-http://127.0.0.1:8899
-```
-
-The default bind address is localhost. Use the folder button in the composer or sidebar to select the project Codex should work in.
-
-### LAN password login
-
-To listen on your LAN, start the server without an authentication variable:
+在项目目录中执行：
 
 ```bash
-HOST=0.0.0.0 npm run start
+npm ci
+npm start
 ```
 
-Open `http://127.0.0.1:8899/settings/access-settings` directly on the server to create or change the public access username and password (12–256 characters). Credential management rejects domains, LAN addresses, `localhost`, IPv6 loopback and forwarded requests. Passwords are stored as salted `scrypt` hashes in `~/.codex/codex-webui-auth.json`; saving new credentials invalidates existing sessions. Remote visitors cannot claim initial setup.
+打开 **http://127.0.0.1:8899**。默认只监听 `127.0.0.1`，端口为 `8899`。
 
-For unattended deployments, provide the password at startup instead:
+首次使用时，在服务器本机页面完成账号密码设置，再选择项目目录开始会话。认证配置入口仅接受直接通过 `127.0.0.1` 或 `localhost` 访问；IPv6 回环地址形式、其他 IP、域名和代理转发请求不能用于管理账号密码等本机配置。通行密钥可在登录后分别于本机或受控 HTTPS 域名下管理。
 
-```bash
-HOST=0.0.0.0 CODEX_WEBUI_PASSWORD='use-a-long-random-password' npm run start
-```
+登录后可在“设置 → 安全 → 通行密钥”添加 Passkey，之后使用设备指纹、面容或 PIN 登录。本机请使用 **http://localhost:8899**；远程访问需要 HTTPS 域名，两个地址的密钥需分别添加。密码仍可作为备用登录方式。
 
-Save a bound domain in the same settings page to enable remote access. Only direct `127.0.0.1` access is allowed until a domain is bound; other IP addresses, `localhost`, IPv6, and unbound domains are rejected. Domain settings are stored next to the credential file as `codex-webui-auth.json.access.json`. Reverse proxies must preserve the external `Host` or supply an accurate `X-Forwarded-Host`, including the external port when applicable. Only the configured domain is accepted from this forwarded header. Domain binding does not configure DNS or TLS. Remote requests must sign in before the main application bundle, HTTP APIs, or WebSocket bridges are available. Successful authentication uses an opaque server-side session with an `HttpOnly`, `SameSite=Strict` cookie. Sessions expire after eight hours and are invalidated on restart.
+## 文档
 
-`CODEX_WEBUI_ACCESS_TOKEN` is an explicit Bearer-only machine credential in password mode; OTP and OIDC disable it. Basic authentication and direct API authentication with a password are not supported. `CODEX_WEBUI_PASSWORD` takes precedence over both the managed password and access token for browser login. Set `CODEX_WEBUI_AUTH_STORE` to move the managed credential file.
+完整目录见 [文档中心](./docs/README.md)。
 
-
-### OTP and OIDC
-
-All APIs, WebSocket bridges, terminal connections and event streams require authentication, including direct loopback access. Initial setup is available only through direct `http://127.0.0.1`; later credential/domain changes also require an authenticated session. Sign out revokes the current session and its connections. Password rotation revokes all sessions.
-
-Set `CODEX_WEBUI_OTP_SECRET` to an independently generated Base32 secret of at least 32 characters and enroll that same secret in an authenticator (SHA1, six digits, 30 seconds). Generate locally with `node --input-type=module -e "import {Secret} from 'otpauth'; console.log(new Secret({size:20}).base32)"`. Configure a password before enabling OTP, then restart. Codes allow one step of clock drift and cannot be reused. Recovery requires a server administrator to replace the secret and restart.
-
-For OIDC, bind the public domain locally first, then configure `CODEX_WEBUI_OIDC_ISSUER`, `CODEX_WEBUI_OIDC_CLIENT_ID`, `CODEX_WEBUI_OIDC_CLIENT_SECRET`, `CODEX_WEBUI_OIDC_REDIRECT_URI` (exact HTTPS URL ending in `/api/auth/oidc/callback`), and `CODEX_WEBUI_OIDC_ALLOWED_SUBJECTS` (comma-separated exact `sub` values). The provider must support `client_secret_post`. OIDC uses the authorization code flow with PKCE, state, nonce, signed ID Token validation and an explicit subject allowlist. Configuring an issuer defaults to OIDC-only authentication; explicitly set `CODEX_WEBUI_AUTH_MODE=both` to also permit password login. OTP applies to password login; enforce OIDC MFA at your identity provider. Configure a password before selecting `both`. OIDC-only mode also disables local password login; later local settings maintenance requires an administrator to temporarily switch to password mode and sign in.
-
-Use an HTTPS reverse proxy and restrict the backend port to that proxy. In password mode, set `CODEX_WEBUI_PUBLIC_ORIGIN=https://codex.example.com` without a trailing slash to enforce the origin and enable Secure cookies. OIDC derives this from the callback URL. Login attempts are limited per TCP peer and globally over five minutes; users behind a proxy share the peer quota. See [.env.example](./.env.example) and the [Chinese configuration guide](./README-zh.md#otp-与统一身份登录). All allowed users control the same Codex instance; this is not tenant isolation.
-
-Messages wait in a per-thread queue while another Codex app or CLI owns the thread, then send automatically in order. The composer shows pending messages with cancel and retry actions. The queue is stored next to the credential file as `codex-webui-auth.json.queue.json` and survives refreshes and restarts. Messages whose delivery was uncertain during a crash require checking the conversation before retrying.
-
-Paste images into the composer or use the plus button to select PNG, JPEG, WebP or GIF files. Image-only messages are supported. Limits: 10 MB per image, 10 images and 20 MB total per message. Configure reverse proxies to accept at least 30 MB request bodies (for Nginx: `client_max_body_size 30m;`).
-
-## Configuration
-
-Copy the example file if you want custom settings:
-
-```bash
-cp .env.example .env
-```
-
-Export configuration variables before starting the service:
-
-```bash
-export HOST=0.0.0.0
-export PORT=8899
-export CODEX_WEBUI_ACCESS_TOKEN="$(openssl rand -hex 32)"
-export CODEX_WEBUI_CWD="$HOME/projects/my-project"
-export CODEX_WEBUI_REVIEW_ROOT="$HOME/projects/my-project"
-npm run start
-```
-
-| Variable | Default | Description |
-| --- | --- | --- |
-| `HOST` | `127.0.0.1` | HTTP/WebSocket bind address |
-| `PORT` | `8899` | HTTP/WebSocket port |
-| `CODEX_WEBUI_PASSWORD` | unset | Optional browser login password for LAN access; bypasses first-run setup |
-| `CODEX_WEBUI_AUTH_STORE` | `$CODEX_HOME/codex-webui-auth.json` | Salted managed password credential created by first-run setup |
-| `CODEX_WEBUI_ACCESS_TOKEN` | unset | Explicit Bearer machine secret in password mode without OTP; also a browser password fallback |
-| `CODEX_WEBUI_CWD` | repository directory | Initial Codex working directory |
-| `CODEX_WEBUI_REVIEW_ROOT` | `CODEX_WEBUI_CWD` | Exact Git root allowed for Undo/Reapply |
-| `CODEX_HOME` | `~/.codex` | Codex state directory containing `auth.json` |
-| `CODEX_WEBUI_APP_SERVER_MODE` | `auto` | Prefer the local shared daemon; `shared` requires it, `standalone` starts an isolated backend |
-| `CODEX_WEBUI_APP_SERVER_SOCKET` | `$CODEX_HOME/app-server-control/app-server-control.sock` | Optional local daemon Unix socket path |
-| `CODEX_AUTH_PATH` | `$CODEX_HOME/auth.json` | Optional explicit Codex authentication file path |
-| `PLAYWRIGHT_EXECUTABLE_PATH` | auto-detected | Optional Chrome/Edge path for browser tests |
-
-Shared connections let WebUI control the same running threads as local Codex. Exiting WebUI only disconnects its client; it never stops the shared daemon. Disconnections trigger reconnection. Standalone mode cannot control threads running in another backend.
-
-## Security model
-
-codex-cli-webui can approve command execution and file changes on your machine. Treat it like a local developer tool with shell access.
-
-- Do **not** expose port `8899` directly to the public Internet.
-- The default listener is `127.0.0.1`. A non-localhost listener requires first-run password setup, `CODEX_WEBUI_PASSWORD`, or `CODEX_WEBUI_ACCESS_TOKEN` before protected HTTP and WebSocket requests are accepted.
-- Browser RPC uses an explicit allowlist and cannot invoke app-server `fs/*`, `config/*`, or account methods.
-- Static serving uses an asset allowlist and rejects symbolic links.
-- Filesystem browsing canonicalizes paths and rejects symlinks that escape the user's home directory.
-- Review Undo/Reapply uses server-owned app-server diffs, rejects client-supplied `cwd`/diff data, symbolic-link patches, and sensitive targets such as `.git`, `.env`, and `node_modules`.
-- Read approval prompts before allowing commands.
-- Account identity combines app-server `account/read` data with Codex's authenticated profile endpoint. It is available only through direct localhost access; LAN clients receive the neutral Settings fallback. Email and raw avatar URLs are not exposed, avatars use a same-origin allowlisted proxy, and `auth.json` tokens remain server-only.
-- Never paste credentials into issues, screenshots, or public logs.
-
-See [SECURITY.md](./SECURITY.md) for the reporting policy.
-
-## Review and approvals
-
-The WebUI handles app-server requests instead of drawing fake approval cards:
-
-- `item/commandExecution/requestApproval`
-- `item/fileChange/requestApproval`
-- `item/permissions/requestApproval`
-
-Review data is driven by `turn/diff/updated`. Unified diffs are parsed into files and hunks, and the Review panel supports:
-
-- Unified / Split view
-- Word wrapping
-- Expand / Collapse all
-- Git-backed Undo (`git apply --reverse`)
-- Git-backed Reapply (`git apply`)
-
-Undo/Reapply is deliberately restricted to the configured repository root.
-
-The shell mirrors Codex Desktop's separate Bottom Panel, Summary, and Task Side Panel controls. The Bottom Panel provides a real authenticated local PTY terminal, while the app-server bridge provides the Review flow and restricted local project selection. Native Desktop-only Task Side Panel Terminal, embedded Browser, and Side task tabs remain visible for structural parity but show a clear unavailable message instead of simulating those capabilities.
-
-## Architecture
-
-```mermaid
-flowchart LR
-    Browser[Browser UI] <-->|WebSocket JSON-RPC| Server[Node.js HTTP + WS server]
-    Server <-->|shared socket / stdio JSON-RPC| Codex[codex app-server]
-    Browser <-->|Authenticated terminal WebSocket| PTY[Node PTY worker]
-    PTY <-->|xterm-256color| Shell[Local login shell]
-    Browser -->|Folder API| Server
-    Browser -->|Review patch API| Server
-    Server -->|git apply / reverse| Repo[Local Git repository]
-```
-
-Main files:
-
-| Path | Responsibility |
+| 文档 | 内容 |
 | --- | --- |
-| `server.ts` | HTTP server, WebSocket bridge, app-server process, folder/config/review APIs |
-| `public/app.js` | Browser state, RPC, threads, approvals, activity, Review, project selection |
-| `public/codex-surfaces.js` | Approval models, unified-diff parsing, split alignment, activity summaries |
-| `public/rendering.js` | Sanitized Markdown and KaTeX rendering |
-| `folder-service.js` | Restricted directory browsing |
-| `review-service.js` | Validated Git Undo/Reapply operations |
-| `tests/` | Unit, integration, browser, mobile, and real approval tests |
+| [部署与访问](./docs/guides/部署与访问.md) | 堡垒机安全网关、网络隔离与 Docker |
+| [配置说明](./docs/guides/配置说明.md) | 界面设置、认证、环境变量、数据与权限 |
+| [开发指南](./docs/development/开发指南.md) | 开发启动、检查、测试与构建 |
+| [贡献指南](./.github/CONTRIBUTING.md) | 问题反馈、代码规范与提交要求 |
+| [安全政策](./.github/SECURITY.md) | 安全边界与漏洞报告 |
+| [第三方声明](./docs/legal/第三方声明.md) | 第三方依赖与视觉资源许可 |
 
-`public/app.bundle.js` is generated automatically when the server starts and is not committed.
+## 说明与许可
 
-During development, `npm run dev` watches both `server.ts` and the browser entry graph rooted at `public/app.js`. Backend changes restart the server, while frontend changes rebuild `public/app.bundle.js`; reload the page to use the new bundle.
+本项目是非官方工具，与 OpenAI 没有隶属、背书或维护关系。Codex 接口可能随版本变化，升级 CLI 后应确认关键功能是否兼容。
 
-Build the browser bundle and a runnable `dist/server.js`:
-
-```bash
-npm run build
-node dist/server.js
-```
-
-## Docker
-
-The repository includes a Compose setup for a local container deployment. Set `CODEX_BIN` to an executable Codex CLI path before starting it; the path is mounted read-only into the container. The app starts in projectless mode by default and stores Codex state through the configured volume.
-
-```bash
-export CODEX_BIN="$HOME/.codex/packages/standalone/releases/VERSION/bin/codex"
-export CODEX_WEBUI_REVIEW_ROOT="$HOME/projects/my-project"
-docker compose up -d --build
-```
-
-The Compose example does not mount the host Docker socket. The image runs as the configured `PUID`/`PGID` user and receives runtime configuration through environment variables.
-
-## Testing
-
-Install Playwright's Chromium if you do not already have a compatible Chrome/Edge binary:
-
-```bash
-npx playwright install chromium
-```
-
-Run the portable unit suite:
-
-```bash
-npm run test:unit
-```
-
-Check server and browser syntax:
-
-```bash
-npm run check
-```
-
-With a running server:
-
-```bash
-npm run test:browser
-```
-
-Tests that require a working, authenticated Codex installation:
-
-```bash
-npm run test:integration
-npm run test:e2e
-```
-
-The real approval E2E asks Codex to execute a harmless command, waits for the actual approval request, clicks **Allow once**, verifies the result, and cleans up its temporary file.
-
-## Codex visual assets
-
-The repository currently includes Codex-style brand and motion assets extracted from a local Codex.app installation to reproduce the desktop experience. Their source and status are documented in [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md). These assets are not covered by this repository's MIT license and may be removed or replaced if requested by the relevant rights holder.
-
-## Known limitations
-
-- The Codex app-server protocol is evolving and may change between CLI versions.
-- Browser tests need a compatible Chromium browser.
-- Undo/Reapply currently operates on the complete aggregated diff, not one hunk at a time.
-- Public access requires HTTPS, authentication and a restricted backend network; multi-tenant permission isolation is not provided.
-
-## Contributing
-
-Please read [CONTRIBUTING.md](./CONTRIBUTING.md) before submitting a pull request. Bug reports and feature requests can be opened through the repository's Issue templates.
-
-## License
-
-Source code is available under the [MIT License](./LICENSE). Third-party components and optional local assets are covered by their own licenses and terms; see [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
+代码许可见 [LICENSE](./LICENSE)。第三方依赖、图标和视觉资源的权利说明见 [第三方声明](./docs/legal/第三方声明.md)，相关资源遵循各自许可与使用条款。安全问题的报告方式见 [SECURITY.md](./.github/SECURITY.md)。

@@ -14,7 +14,7 @@ const fixtureRoot=mkdtempSync(join(tmpdir(),'codex-webui-download-'));
 const fixture=join(fixtureRoot,"agent's result.txt");
 const body='downloaded from the Codex conversation\n';
 writeFileSync(fixture,body);
-const server=startProcess([process.execPath,'--import','tsx','server.ts'],{cwd:root,env:{...process.env,HOST:'127.0.0.1',PORT:String(port)},stdout:'ignore',stderr:'ignore'});
+const server=startProcess([process.execPath,'--import','tsx','server/index.ts'],{cwd:root,env:{...process.env,HOST:'127.0.0.1',PORT:String(port)},stdout:'ignore',stderr:'ignore'});
 let browser;
 
 try{

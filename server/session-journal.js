@@ -1,7 +1,7 @@
 import { appendFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
 import { join } from 'node:path';
-import { applySessionDelta } from './public/session-delta.js';
+import { applySessionDelta } from '../public/session-delta.js';
 
 export function atomicJson(path, value) {
   const temporary = `${path}.${randomUUID()}.tmp`;

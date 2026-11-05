@@ -2,11 +2,11 @@ import { expect, test } from 'vitest';
 import { mkdtempSync, rmSync, appendFileSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { SessionService } from '../session-service.js';
-import { SessionJournal } from '../session-journal.js';
-import { PendingRequests } from '../pending-requests.js';
-import { createSessionRequestHandlers } from '../session-request-service.js';
-import { mergeTurnSources, upsertSessionItem } from '../session-items.js';
+import { SessionService } from '../server/session-service.js';
+import { SessionJournal } from '../server/session-journal.js';
+import { PendingRequests } from '../server/pending-requests.js';
+import { createSessionRequestHandlers } from '../server/session-request-service.js';
+import { mergeTurnSources, upsertSessionItem } from '../server/session-items.js';
 
 const deferred = () => { let resolve; const promise = new Promise(r => resolve = r); return { promise, resolve }; };
 const thread = id => ({ id, status: { type: 'idle' }, turns: [] });

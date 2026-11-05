@@ -1,8 +1,8 @@
 import { isDeepStrictEqual } from 'node:util';
 import { SessionJournal } from './session-journal.js';
 import { reduceSessionNotification } from './session-reducer.js';
-import { validateImageInputs } from './public/composer-input.js';
-import { sessionDelta } from './public/session-delta.js';
+import { validateImageInputs } from '../public/composer-input.js';
+import { sessionDelta } from '../public/session-delta.js';
 import { mergeStreamingTurn } from './session-items.js';
 import { withAsyncQuestions } from './async-user-input.js';
 

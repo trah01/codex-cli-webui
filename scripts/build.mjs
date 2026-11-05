@@ -13,7 +13,7 @@ await build({
 });
 await build({
   absWorkingDir: root,
-  entryPoints: ['server.ts'],
+  entryPoints: ['server/index.ts'],
   outfile: 'dist/server.js',
   bundle: true,
   platform: 'node',
@@ -21,4 +21,4 @@ await build({
   format: 'esm',
   packages: 'external',
 });
-await copyFile(new URL('../terminal-worker.js', import.meta.url), new URL('../dist/terminal-worker.js', import.meta.url));
+await copyFile(new URL('../server/terminal-worker.js', import.meta.url), new URL('../dist/terminal-worker.js', import.meta.url));

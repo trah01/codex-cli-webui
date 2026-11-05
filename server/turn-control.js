@@ -1,4 +1,4 @@
-import { bridgeErrorCode, THREAD_NOT_FOUND } from './public/bridge-errors.js';
+import { bridgeErrorCode, THREAD_NOT_FOUND } from '../public/bridge-errors.js';
 
 export async function interruptThread(request, params) {
   if (typeof params.threadId !== 'string' || !params.threadId || typeof params.turnId !== 'string' || !params.turnId) throw new Error('Invalid active turn');

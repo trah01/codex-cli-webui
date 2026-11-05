@@ -10,9 +10,11 @@ By participating, you agree to follow the [Code of Conduct](./CODE_OF_CONDUCT.md
 - Open an issue before a large protocol, security, architecture, or dependency change.
 - Keep changes focused. Avoid unrelated formatting or generated-file churn.
 - Never include API keys, authentication files, account data, private prompts, absolute personal paths, or unredacted logs.
-- Do not commit unpacked application bundles. New third-party assets require clear redistribution rights and an update to `THIRD_PARTY_NOTICES.md`.
+- Do not commit unpacked application bundles. New third-party assets require clear redistribution rights and an update to [third-party notices](../docs/legal/第三方声明.md).
 
 Security vulnerabilities must be reported privately as described in [SECURITY.md](./SECURITY.md), not in a public issue.
+
+See the [documentation index](../docs/README.md) and [development guide](../docs/development/开发指南.md) for project documentation.
 
 ## Development setup
 
@@ -70,7 +72,7 @@ npm run build
 - Validate the exact Git root before review patch operations.
 - Map approval decisions to actual app-server response shapes.
 - Do not add endpoints that accept arbitrary commands from an unauthenticated browser.
-- Preserve localhost-only defaults and authenticated LAN access.
+- Preserve localhost-only defaults and controlled network access. Do not expose the WebUI directly to the public Internet, even with authentication or HTTPS. Remote access should pass through a bastion security gateway reverse proxy.
 
 ## Testing
 
@@ -107,7 +109,7 @@ A pull request should:
 - describe security implications, including when there are none;
 - list the exact validation commands and results;
 - include screenshots for visual changes;
-- update both READMEs when usage or configuration changes.
+- update the relevant guides under `docs/`, the Chinese project README, and `docs/en/README.md` when usage or configuration changes.
 
 Use short, descriptive commit subjects. Conventional Commit prefixes are welcome:
 
@@ -124,4 +126,4 @@ Include the operating system, Node.js version, Codex CLI version, browser, exact
 
 ## License
 
-By contributing, you agree that your contribution is licensed under the repository's [MIT License](./LICENSE). Submit only code and assets you have permission to redistribute.
+By contributing, you agree that your contribution is licensed under the repository's [MIT License](../LICENSE). Submit only code and assets you have permission to redistribute.

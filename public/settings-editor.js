@@ -1,8 +1,26 @@
+import { renderPasskeySettings } from './passkey-settings.js';
+import { bindSettingsAutosave } from './settings-autosave.js';
+import { renderAuthenticationSettings } from './authentication-settings.js';
 import { renderAccessSettings } from './access-settings.js';
 
 export function createSettingsEditor(context) {
   const { t, rpc } = context;
   let generation = 0;
+  let autosaves = [], pendingWrites = Promise.resolve();
+  function flushEdits() {
+    const editors = autosaves; autosaves = [];
+    pendingWrites = Promise.all([pendingWrites, ...editors.map(editor => editor.flush())]);
+    return pendingWrites;
+  }
+  function groupRows(container) {
+    let group;
+    for (const child of [...container.children]) {
+      if (child.matches('.settings-row')) {
+        if (!group) { group = document.createElement('div'); group.className = 'settings-group'; container.insertBefore(group, child); }
+        group.append(child);
+      } else { group = null; if (child.tagName === 'DIV' && !child.className) groupRows(child); }
+    }
+  }
   function text(container, message) {
     const node = document.createElement('p');
     node.className = 'settings-feedback'; node.textContent = t(message); container.append(node);
@@ -37,17 +55,25 @@ export function createSettingsEditor(context) {
     container.append(node); return node;
   }
   async function configuration(container, current) {
-    const models = context.models();
-    select(container, 'Model', models.map(model => [model.model, model.displayName || model.model]), context.model(), async value => {
-      context.chooseModel(value); await render('agent', container);
-    });
-    select(container, 'Reasoning effort', context.efforts(), context.effort(), value => context.chooseEffort(value));
-    select(container, 'Selected mode', context.permissions(), context.permission(), value => context.choosePermission(value));
-    const remote = document.createElement('div'); container.append(remote);
-    const loading = text(remote, 'Loading…');
-    const settings = await rpc('host/settings/read', { cwd: context.cwd() || undefined });
+    const loading = text(container, 'Loading…');
+    const [settings, defaults] = await Promise.all([
+      rpc('host/settings/read', {}), rpc('host/settings/read', { scope: 'chat-defaults' }),
+    ]);
     if (current !== generation) return;
     loading.remove();
+    const models = context.models(), model = models.find(item => item.model === defaults.model) || models.find(item => item.isDefault) || models[0];
+    const saveDefault = async (field, value) => {
+      await rpc('host/settings/write', { field, value });
+      await context.defaultsChanged();
+    };
+    select(container, 'Model', models.map(item => [item.model, item.displayName || item.model]), model?.model, async value => {
+      await saveDefault('model', value); await render('agent', container);
+    });
+    const efforts = model?.supportedReasoningEfforts || [{ reasoningEffort: 'medium' }];
+    const effort = efforts.some(item => item.reasoningEffort === defaults.reasoningEffort) ? defaults.reasoningEffort : model?.defaultReasoningEffort || efforts[0]?.reasoningEffort;
+    select(container, 'Reasoning effort', efforts.map(item => [item.reasoningEffort, context.reasoningLabel(item.reasoningEffort)]), effort, value => saveDefault('reasoningEffort', value));
+    select(container, 'Selected mode', context.permissions().filter(([mode]) => !mode.startsWith('profile:')), defaults.permissionMode, value => saveDefault('permissionMode', value));
+    const remote = document.createElement('div'); container.append(remote);
     const actions = document.createElement('div'); actions.className = 'settings-actions';
     const saved = text(actions, 'Changes to Codex configuration apply to new chats.'); saved.setAttribute('role', 'status');
     select(remote, 'Web search', [['disabled', 'Disabled'], ['cached', 'Cached search'], ['live', 'Live search']], settings.webSearch, async value => {
@@ -56,9 +82,10 @@ export function createSettingsEditor(context) {
     const label = document.createElement('label'), title = document.createElement('strong'), input = document.createElement('textarea');
     label.className = 'settings-instructions'; title.textContent = t('Custom instructions'); input.value = settings.instructions; input.rows = 6; input.maxLength = 100000;
     label.append(title, input); remote.append(label);
-    button(actions, 'Save instructions', async () => {
-      await rpc('host/settings/write', { field: 'instructions', value: input.value }); saved.textContent = t('Saved. Start a new chat to use this setting.');
-    });
+    autosaves.push(bindSettingsAutosave(label, { feedback: saved, t, delay: 800, save: async () => {
+      await rpc('host/settings/write', { field: 'instructions', value: input.value });
+      saved.textContent = t('Saved. Start a new chat to use this setting.');
+    } }));
     remote.append(actions);
   }
   function review(container) {
@@ -81,26 +108,12 @@ export function createSettingsEditor(context) {
     label.append(title, input); container.append(label);
     const actions = document.createElement('div'); actions.className = 'settings-actions'; container.append(actions);
     const status = text(actions, ''); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
-    let saving = false;
-    const save = document.createElement('button');
-    save.type = 'button'; save.className = 'integration-refresh'; save.textContent = t('Save'); actions.append(save);
-    save.onclick = async () => {
-      saving = true; save.disabled = true; input.disabled = true; status.textContent = t('Saving…');
-      try {
-        const result = await rpc('host/settings/write', { field: 'globalInstructions', value: input.value, version: settings.version });
-        if (current !== generation) return;
-        const fallback = result.path !== settings.path;
-        settings = result; input.value = result.instructions; source.textContent = result.path;
-        status.textContent = t(fallback ? 'Saved. The fallback global instructions are now active for new chats.' : 'Saved. Start a new chat to use this setting.');
-      } catch (error) {
-        if (current === generation) status.textContent = t(error.message);
-      } finally {
-        saving = false; input.disabled = false;
-        save.disabled = input.value === settings.instructions;
-      }
-    };
-    save.disabled = true;
-    input.oninput = () => { save.disabled = saving || input.value === settings.instructions; status.textContent = ''; };
+    autosaves.push(bindSettingsAutosave(label, { feedback: status, t, delay: 800, save: async () => {
+      const result = await rpc('host/settings/write', { field: 'globalInstructions', value: input.value, version: settings.version });
+      const fallback = result.path !== settings.path;
+      settings = result; input.value = result.instructions; source.textContent = result.path;
+      status.textContent = t(fallback ? 'Saved. The fallback global instructions are now active for new chats.' : 'Saved. Start a new chat to use this setting.');
+    } }));
   }
   async function plugins(container, current) {
     const loading = text(container, 'Loading…');
@@ -114,10 +127,26 @@ export function createSettingsEditor(context) {
     for (const error of result.marketplaceLoadErrors || []) text(container, error.message);
     if (!count) text(container, 'No installed plugins found');
   }
+  async function securitySettings(page, container, current) {
+    const content = document.createElement('div');
+    const editors = page === 'access-settings' || page === 'domain-settings'
+      ? await renderAccessSettings(content, t, page)
+      : await renderAuthenticationSettings(content, page === 'otp-settings' ? 'otp' : 'oidc');
+    if (current !== generation) return;
+    container.append(...content.childNodes); autosaves.push(...editors);
+  }
   async function render(page, container) {
-    const current = ++generation; container.replaceChildren();
+    const pending = flushEdits();
+    const current = ++generation;
+    await pending;
+    if (current !== generation) return;
+    container.replaceChildren();
     try {
-      if (page === 'access-settings') await renderAccessSettings(container, t);
+      if (['access-settings', 'domain-settings', 'otp-settings', 'oidc-settings'].includes(page)) await securitySettings(page, container, current);
+      else if (page === 'passkey-settings') {
+        const content = document.createElement('div'); await renderPasskeySettings(content, t);
+        if (current === generation) container.append(...content.childNodes);
+      }
       else if (page === 'agent') await configuration(container, current);
       else if (page === 'global-instructions') await globalInstructions(container, current);
       else if (page === 'code-review') review(container);
@@ -125,9 +154,10 @@ export function createSettingsEditor(context) {
       else if (page === 'browser-use') {
         button(container, 'Open browser panel', () => { context.closeSettings(); context.openBrowser(); });
       }
+      if (current === generation) groupRows(container);
     } catch (error) {
       if (current === generation) text(container, `${t('Cannot load settings')}: ${error.message}`);
     }
   }
-  return { render, cancel: () => { generation++; } };
+  return { render, cancel: () => { flushEdits(); generation++; } };
 }

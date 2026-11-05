@@ -1,9 +1,9 @@
 import { expect, test, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
-import { PendingRequests } from '../pending-requests.js';
+import { PendingRequests } from '../server/pending-requests.js';
 import { createUserInputDialog } from '../public/user-input.js';
-import { parseRollout } from '../live-session-service.js';
+import { parseRollout } from '../server/live-session-service.js';
 import { createConversationScroll } from '../public/conversation-scroll.js';
 import { createActivityMotion } from '../public/activity-motion.js';
 

@@ -33,3 +33,12 @@ export function browserSandboxFor(targetUrl, appUrl) {
     return BASE_BROWSER_SANDBOX;
   }
 }
+
+export function browserNavigationTarget(value, appUrl, mode = 'auto') {
+  const result = normalizeBrowserUrl(value);
+  if (result.error) return result;
+  const target = new URL(result.url), app = new URL(appUrl);
+  const host = target.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  const local = host === 'localhost' || host.endsWith('.localhost') || host === '::1' || /^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host) || /^172\.(?:1[6-9]|2\d|3[01])\./.test(host);
+  return { ...result, action: mode === 'preview' || local || target.origin === app.origin ? 'preview' : 'external' };
+}
