@@ -49,12 +49,12 @@ export function mergeTurnSources(nativeTurn, rolloutTurn) {
     const position = next ? items.indexOf(next) : previous ? items.indexOf(previous) + 1 : items.length;
     items.splice(position, 0, native[index]); previous = native[index];
   }
-  return { ...nativeTurn, ...rolloutTurn, items };
+  return settleTurnActivities({ ...nativeTurn, ...rolloutTurn, items });
 }
 
 // Polling snapshots can lag behind text already received through notifications.
 export function mergeStreamingTurn(previous, snapshot) {
-  if (previous?.status !== 'inProgress') return snapshot;
+  if (previous?.status !== 'inProgress') return settleTurnActivities(snapshot);
   const turn = { ...snapshot, items: structuredClone(previous.items || []) };
   for (const item of snapshot.items || []) {
     const ids = new Set([item.id, ...Object.values(item.sourceIds || {})]);
@@ -66,5 +66,14 @@ export function mergeStreamingTurn(previous, snapshot) {
     }
     upsertSessionItem(turn, incoming);
   }
-  return turn;
+  return settleTurnActivities(turn);
+}
+
+
+// A terminal turn cannot keep child animations/tools in a running state after a missed item/completed.
+export function settleTurnActivities(turn) {
+  if (!['completed', 'failed', 'interrupted', 'cancelled', 'canceled'].includes(turn?.status)) return turn;
+  const running = item => ['inProgress', 'running', 'pendingInit'].includes(item.status);
+  if (!(turn.items || []).some(running)) return turn;
+  return { ...turn, items: turn.items.map(item => running(item) ? { ...item, status: turn.status } : item) };
 }

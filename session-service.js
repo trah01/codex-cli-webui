@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util';
 import { SessionJournal } from './session-journal.js';
 import { reduceSessionNotification } from './session-reducer.js';
 import { validateImageInputs } from './public/composer-input.js';
@@ -87,8 +88,9 @@ export class SessionService {
       const previous = previousTurns.get(turn.id);
       for (const key of ['startedAtMs', 'completedAtMs']) if (previous?.[key] !== undefined && turn[key] === undefined) turn[key] = previous[key];
     }
-    const patch = { thread, requests: this.loadRequests(id) ?? entry.state.requests, queue: this.loadQueue(id) ?? entry.state.queue };
-    if (JSON.stringify({ thread: entry.state.thread, requests: entry.state.requests, queue: entry.state.queue }) !== JSON.stringify(patch)) this.publish(id, patch);
+    const patch = { thread, requests: withAsyncQuestions(thread, this.loadRequests(id) ?? entry.state.requests, entry.state.requests), queue: this.loadQueue(id) ?? entry.state.queue };
+    // Object key order is not a content change; compare the same derived projection that publish stores.
+    if (!isDeepStrictEqual({ thread: entry.state.thread, requests: entry.state.requests, queue: entry.state.queue }, patch)) this.publish(id, patch);
     entry.loaded = true;
     for (const turn of thread.turns || []) this.turnOwners.set(turn.id, id);
     return entry;

@@ -75,6 +75,7 @@ test('streamed output accumulates from the first delta and an empty completion s
     f.service.notification('turn/completed', { threadId: 'a', turn: { id: 'turn', items: [], status: 'completed' } });
     const turn = f.service.entry('a').state.thread.turns[0];
     expect(turn.items[0].aggregatedOutput).toBe('first\nsecond\n'); expect(turn.status).toBe('completed');
+    expect(turn.items[0].status).toBe('completed');
   } finally { f.close(); }
 });
 
@@ -204,5 +205,39 @@ test('requests persist every lifecycle transition and never resend an unconfirme
     crash.answer(8, 'a', () => sent++); expect(sent).toBe(2);
     crash.reconcile('a', [{ id: 'turn', status: 'completed' }]);
     expect(crash.listStates('a').every(record => record.status === 'ended')).toBe(true);
+  } finally { f.close(); }
+});
+
+
+test('polling a finished turn cannot revive stale running activities or emit endless idle updates', async () => {
+  const f = setup({ loadThread: async () => ({ id: 'a', status: { type: 'idle' }, turns: [{ id: 'turn', status: 'completed', items: [{ id: 'tool', type: 'mcpToolCall', status: 'inProgress' }] }] }) });
+  const events = [];
+  try {
+    await f.service.subscribe({}, { threadId: 'a' }, event => events.push(event));
+    expect(f.service.entry('a').state.thread.turns[0].items[0].status).toBe('completed');
+    events.length = 0;
+    for (let poll = 0; poll < 20; poll++) await f.service.refresh('a');
+    expect(events).toHaveLength(0);
+  } finally { f.close(); }
+});
+
+
+test('idle snapshots with different object key order and derived async questions do not rebroadcast', async () => {
+  let text = 'Which option?';
+  const f = setup({
+    loadRequests: () => [],
+    loadThread: async () => ({ status: { type: 'idle' }, turns: [{ status: 'completed', id: 'turn', items: [{ text, questions: [{ title: 'Choose', options: ['A', 'B'] }], type: 'agentMessage', id: 'question' }] }], id: 'a' }),
+  });
+  const events = [];
+  try {
+    await f.service.subscribe({}, { threadId: 'a' }, event => events.push(event));
+    expect(f.service.entry('a').state.requests).toHaveLength(1);
+    events.length = 0;
+    for (let poll = 0; poll < 100; poll++) await f.service.refresh('a');
+    expect(events).toHaveLength(0);
+    text = 'Changed'; await f.service.refresh('a');
+    expect(events).toHaveLength(1);
+    expect(events[0].patch.thread.turns[0].items[0].text).toBe('Changed');
+    await f.service.refresh('a'); expect(events).toHaveLength(1);
   } finally { f.close(); }
 });

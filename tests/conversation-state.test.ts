@@ -5,6 +5,7 @@ import { PendingRequests } from '../pending-requests.js';
 import { createUserInputDialog } from '../public/user-input.js';
 import { parseRollout } from '../live-session-service.js';
 import { createConversationScroll } from '../public/conversation-scroll.js';
+import { createActivityMotion } from '../public/activity-motion.js';
 
 test('scrolling upward cancels queued bottom-follow and only explicit navigation resumes it', () => {
   const dom = new JSDOM('<main></main><button hidden>回到最新</button>');
@@ -139,4 +140,54 @@ test('typing without changing submit mode preserves the send button DOM', () => 
   sync(); const icon = document.querySelector('svg');
   document.querySelector('textarea').value = 'typing'; sync();
   expect(document.querySelector('svg')).toBe(icon);
+});
+
+
+function motionFixture() {
+  const dom = new JSDOM('<article data-turn-id="turn" data-timing-status="inProgress"><div class="active"><span class="activity-motion"></span></div></article>');
+  const row = dom.window.document.querySelector('.active'), holder = row.firstElementChild;
+  const loads = [], players = new Set(); let hidden = false;
+  const manager = createActivityMotion({
+    loadData: (_name, signal) => new Promise(resolve => { loads.push({ signal, resolve }); }),
+    createAnimation: () => {
+      const player = { paused: false, pause() { this.paused = true; }, play() { this.paused = false; }, destroy() { players.delete(this); } };
+      players.add(player); return player;
+    }, hidden: () => hidden,
+  });
+  return { dom, manager, row, holder, loads, players, setHidden: value => { hidden = value; } };
+}
+
+test('completed turns cannot start animations even when a stale tool still says running', async () => {
+  const f = motionFixture(); f.row.parentElement.dataset.timingStatus = 'completed';
+  await f.manager.mount(f.row, f.holder, 'searching');
+  expect(f.loads).toHaveLength(0); expect(f.players.size).toBe(0);
+});
+
+test('stopped and replaced animation loads cannot create orphan players', async () => {
+  const f = motionFixture(), first = f.manager.mount(f.row, f.holder, 'searching');
+  const second = f.manager.mount(f.row, f.holder, 'searching');
+  expect(f.loads[0].signal.aborted).toBe(true);
+  f.loads[1].resolve({}); await second; expect(f.players.size).toBe(1);
+  f.loads[0].resolve({}); await first; expect(f.players.size).toBe(1);
+  f.manager.clear(); expect(f.players.size).toBe(0);
+  const last = f.manager.mount(f.row, f.holder, 'searching'); f.manager.stop(f.row);
+  f.loads[2].resolve({}); await last; expect(f.players.size).toBe(0);
+});
+
+test('repeated teardown aborts all pending animation loads without accumulating players', async () => {
+  const f = motionFixture(), tasks = [];
+  for (let update = 0; update < 100; update++) { tasks.push(f.manager.mount(f.row, f.holder, 'searching')); f.manager.clear(); }
+  expect(f.loads.every(load => load.signal.aborted)).toBe(true);
+  for (const load of f.loads) load.resolve({});
+  await Promise.all(tasks); expect(f.players.size).toBe(0);
+});
+
+test('hidden pages pause players and terminal activities release them', async () => {
+  const f = motionFixture(), task = f.manager.mount(f.row, f.holder, 'searching');
+  f.loads[0].resolve({}); await task;
+  const player = [...f.players][0];
+  f.setHidden(true); f.manager.updateVisibility(); expect(player.paused).toBe(true);
+  f.setHidden(false); f.manager.updateVisibility(); expect(player.paused).toBe(false);
+  f.row.parentElement.dataset.timingStatus = 'completed'; f.manager.updateVisibility();
+  expect(f.players.size).toBe(0);
 });

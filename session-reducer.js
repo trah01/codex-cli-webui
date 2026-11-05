@@ -1,4 +1,4 @@
-import { upsertSessionItem as upsert } from './session-items.js';
+import { upsertSessionItem as upsert, settleTurnActivities } from './session-items.js';
 function turnOf(state, id) {
   if (!id) return null;
   const turns = state.thread.turns ||= [];
@@ -19,6 +19,7 @@ export function reduceSessionNotification(state, method, params) {
     Object.assign(turn, params.turn, { status: params.turn?.status || (method === 'turn/started' ? 'inProgress' : 'completed') });
     if (!params.turn?.items?.length) turn.items = previousItems;
     turn.items ||= [];
+    turn.items = settleTurnActivities(turn).items;
     if (method === 'turn/started') turn.startedAtMs ||= Date.now();
     else turn.completedAtMs ||= Date.now();
     return { turn: structuredClone(turn), thread: { status: { type: method === 'turn/started' ? 'active' : 'idle' } } };
