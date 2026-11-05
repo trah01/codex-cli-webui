@@ -11,7 +11,7 @@ const tempRoot=mkdtempSync(join(tmpdir(),'codex-webui-login-'));
 const storePath=join(tempRoot,'auth.json');
 saveBoundDomain(`${storePath}.access.json`,domain);
 const remoteFetch=(url,options={})=>fetch(url.replace(`http://${domain}:`,`http://127.0.0.1:`),{...options,headers:{...options.headers,host:`${domain}:${port}`}});
-const server=spawn('bun',['run','server.ts'],{
+const server=spawn(process.execPath,['--import','tsx','server.ts'],{
   cwd:new URL('..',import.meta.url).pathname,
   env:{...process.env,HOST:'0.0.0.0',PORT:String(port),CODEX_WEBUI_PASSWORD:password,CODEX_WEBUI_ACCESS_TOKEN:'',CODEX_WEBUI_AUTH_STORE:storePath},
   stdio:['ignore','pipe','pipe'],

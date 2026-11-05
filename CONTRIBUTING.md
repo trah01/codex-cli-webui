@@ -1,6 +1,6 @@
-# Contributing to Codex WebUI
+# Contributing to codex-cli-webui
 
-Thanks for helping improve Codex WebUI. Contributions should preserve the project's core behavior: the interface reflects real Codex app-server state and events instead of simulating activity in the browser.
+Thanks for helping improve codex-cli-webui. Contributions should preserve the project's core behavior: the interface reflects real Codex app-server state and events instead of simulating activity in the browser.
 
 By participating, you agree to follow the [Code of Conduct](./CODE_OF_CONDUCT.md).
 
@@ -18,20 +18,18 @@ Security vulnerabilities must be reported privately as described in [SECURITY.md
 
 Requirements:
 
-- Bun 1.3 or newer
-- Node.js 20 or newer for the PTY worker
+- Node.js 24.22.1+ (24.x) or 26.12.1+ (26.x), and npm
 - Git
 - An installed and authenticated Codex CLI for integration tests
 - Chrome, Edge, or Playwright Chromium for browser tests
 
 ```bash
-git clone https://github.com/lezi-fun/codex-webui.git
-cd codex-webui
-bun install
-bun run dev
+cd codex-cli-webui
+npm install
+npm run dev
 ```
 
-Open `http://127.0.0.1:8899`. Use `bun run start` when file watching is not needed.
+Open `http://127.0.0.1:8899`. Use `npm run start` when file watching is not needed.
 
 ## Project conventions
 
@@ -63,7 +61,7 @@ Visual changes should be based on observable behavior or locally unpacked refere
 Edit source files such as `public/app.js`; do not edit `public/app.bundle.js` or files under `dist/` by hand. Generate them with:
 
 ```bash
-bun run build
+npm run build
 ```
 
 ### Filesystem and network safety
@@ -79,23 +77,23 @@ bun run build
 Run checks proportional to the change. The baseline for a pull request is:
 
 ```bash
-bun run test:unit
-bun run check
+npm run test:unit
+npm run check
 git diff --check
 ```
 
 For browser-facing changes, start the server and run the relevant browser test or the full suite:
 
 ```bash
-bun run start
-bun run test:browser
+npm run start
+npm run test:browser
 ```
 
 Tests requiring an authenticated Codex installation are separate:
 
 ```bash
-bun run test:integration
-bun run test:e2e
+npm run test:integration
+npm run test:e2e
 ```
 
 If a suite cannot be run locally, state that clearly in the pull request.
@@ -122,7 +120,7 @@ docs: document review root configuration
 
 ## Reporting bugs
 
-Include the operating system, Bun version, Codex CLI version, browser, exact reproduction steps, non-sensitive logs, and screenshots when relevant. Note whether the behavior also occurs in Codex CLI or the desktop app.
+Include the operating system, Node.js version, Codex CLI version, browser, exact reproduction steps, non-sensitive logs, and screenshots when relevant. Note whether the behavior also occurs in Codex CLI or the desktop app.
 
 ## License
 

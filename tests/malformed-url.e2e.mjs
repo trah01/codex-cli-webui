@@ -1,3 +1,4 @@
+import { startProcess } from './process-runtime.mjs';
 import { createConnection, createServer } from 'node:net';
 
 const root = new URL('..', import.meta.url).pathname;
@@ -18,7 +19,7 @@ async function waitFor(check, timeout = 20_000) {
   const started = Date.now();
   while (Date.now() - started < timeout) {
     try { if (await check()) return; } catch {}
-    await Bun.sleep(50);
+    await new Promise(resolve => setTimeout(resolve, 50));
   }
   throw new Error('Timed out waiting for temporary server');
 }
@@ -37,7 +38,7 @@ function rawRequest(port, request) {
 }
 
 const port = await freePort();
-const server = Bun.spawn(['bun', 'run', 'server.ts'], {
+const server = startProcess([process.execPath, '--import', 'tsx', 'server.ts'], {
   cwd: root,
   env: { ...process.env, HOST: '127.0.0.1', PORT: String(port) },
   stdout: 'pipe',

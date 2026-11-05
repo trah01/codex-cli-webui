@@ -10,7 +10,7 @@ Do not publish exploitable details in a public issue. Use GitHub's private vulne
 
 ## Security model
 
-Codex WebUI runs commands and edits files through the local Codex app-server. Treat it as a local developer tool, not as a hardened multi-tenant service.
+codex-cli-webui runs commands and edits files through the local Codex app-server. Treat it as a local developer tool, not as a hardened multi-tenant service.
 
 - Do not expose port `8899` directly to the public Internet.
 - The default listener is `127.0.0.1`. A non-localhost listener requires first-run LAN password setup, `CODEX_WEBUI_PASSWORD`, or `CODEX_WEBUI_ACCESS_TOKEN` before protected HTTP and WebSocket requests are accepted. First-run setup must be completed only on a trusted LAN because the first reachable client can claim it.

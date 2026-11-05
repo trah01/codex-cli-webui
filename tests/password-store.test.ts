@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -45,7 +45,7 @@ describe("managed LAN password store", () => {
     const path = join(root, "auth.json");
     try {
       writeFileSync(path, '{"version":1,"algorithm":"scrypt"}\n');
-      expect(() => loadStoredPassword(path)).toThrow("Invalid Codex WebUI password store");
+      expect(() => loadStoredPassword(path)).toThrow("Invalid codex-cli-webui password store");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

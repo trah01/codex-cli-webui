@@ -1,13 +1,14 @@
+import { startProcess } from './process-runtime.mjs';
 import { createServer } from 'node:net';
 import { chromium } from 'playwright';
 import { artifact, launchOptions } from './browser-runtime.mjs';
 
 const root=new URL('..',import.meta.url).pathname;
 async function freePort(){return await new Promise((resolve,reject)=>{const probe=createServer();probe.once('error',reject);probe.listen(0,'127.0.0.1',()=>{const address=probe.address();if(!address||typeof address==='string')return reject(new Error('Could not allocate composer test port'));probe.close(error=>error?reject(error):resolve(address.port))})})}
-async function waitFor(check,timeout=20_000){const started=Date.now();while(Date.now()-started<timeout){try{if(await check())return}catch{}await Bun.sleep(50)}throw new Error('Timed out waiting for composer test server')}
+async function waitFor(check,timeout=20_000){const started=Date.now();while(Date.now()-started<timeout){try{if(await check())return}catch{}await new Promise(resolve => setTimeout(resolve, 50))}throw new Error('Timed out waiting for composer test server')}
 
 const port=await freePort(),base=`http://127.0.0.1:${port}`;
-const server=Bun.spawn(['bun','run','server.ts'],{cwd:root,env:{...process.env,HOST:'127.0.0.1',PORT:String(port)},stdout:'ignore',stderr:'ignore'});
+const server=startProcess([process.execPath,'--import','tsx','server.ts'],{cwd:root,env:{...process.env,HOST:'127.0.0.1',PORT:String(port)},stdout:'ignore',stderr:'ignore'});
 let browser;
 try{
   await waitFor(async()=>(await fetch(`${base}/api/health`)).ok);

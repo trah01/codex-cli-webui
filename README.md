@@ -1,4 +1,4 @@
-# Codex WebUI
+# codex-cli-webui
 
 <p align="center">
   <strong>A local, LAN-accessible WebUI for the real Codex app-server.</strong>
@@ -11,18 +11,16 @@
 </p>
 
 <p align="center">
-  <a href="./LICENSE"><img alt="MIT License" src="https://img.shields.io/github/license/lezi-fun/codex-webui?style=flat-square"></a>
-  <a href="https://github.com/lezi-fun/codex-webui/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/lezi-fun/codex-webui?style=flat-square"></a>
-  <a href="https://github.com/lezi-fun/codex-webui/issues"><img alt="GitHub issues" src="https://img.shields.io/github/issues/lezi-fun/codex-webui?style=flat-square"></a>
-  <a href="https://bun.sh/"><img alt="Bun 1.3 or newer" src="https://img.shields.io/badge/Bun-1.3%2B-fbf0df?style=flat-square&amp;logo=bun&amp;logoColor=000"></a>
 </p>
 
 > [!IMPORTANT]
 > This is an **unofficial community project**. It is not affiliated with, endorsed by, or maintained by OpenAI. OpenAI and Codex are trademarks of their respective owners.
 
-Codex WebUI connects to the existing local Codex daemon when available, otherwise starts `codex app-server --stdio`, and exposes the local Codex experience through a responsive browser interface. It keeps real threads, models, streaming responses, tool activity, approval requests, diffs, and token usage instead of simulating them in a static frontend.
+codex-cli-webui connects to the existing local Codex daemon when available, otherwise starts `codex app-server --stdio`, and exposes the local Codex experience through a responsive browser interface. It keeps real threads, models, streaming responses, tool activity, approval requests, diffs, and token usage instead of simulating them in a static frontend.
 
-![Codex WebUI desktop screenshot](./docs/assets/overview.png)
+![codex-cli-webui desktop screenshot](./docs/assets/overview.png)
+
+Based on [lezi-fun/codex-webui](https://github.com/lezi-fun/codex-webui), originally authored by lezi-fun. Original copyright and MIT license notices are retained.
 
 ## Highlights
 
@@ -46,8 +44,7 @@ Codex WebUI connects to the existing local Codex daemon when available, otherwis
 
 ## Requirements
 
-- [Bun](https://bun.sh/) 1.3 or newer
-- Node.js 20 or newer, used by the native PTY worker
+- Node.js 24.22.1+ (24.x) or 26.12.1+ (26.x), and npm
 - [OpenAI Codex CLI](https://www.npmjs.com/package/@openai/codex), installed and authenticated
 - Git, for Review Undo/Reapply
 - macOS or Linux recommended; Windows has not been fully tested
@@ -64,10 +61,9 @@ Complete the Codex sign-in flow before starting this project.
 ## Quick start
 
 ```bash
-git clone https://github.com/lezi-fun/codex-webui.git
-cd codex-webui
-bun install
-bun run start
+cd codex-cli-webui
+npm install
+npm run start
 ```
 
 Open:
@@ -83,7 +79,7 @@ The default bind address is localhost. Use the folder button in the composer or 
 To listen on your LAN, start the server without an authentication variable:
 
 ```bash
-HOST=0.0.0.0 bun run start
+HOST=0.0.0.0 npm run start
 ```
 
 Open `http://127.0.0.1:8899/settings/access-settings` directly on the server to create or change the public access username and password (12–256 characters). Credential management rejects domains, LAN addresses, `localhost`, IPv6 loopback and forwarded requests. Passwords are stored as salted `scrypt` hashes in `~/.codex/codex-webui-auth.json`; saving new credentials invalidates existing sessions. Remote visitors cannot claim initial setup.
@@ -91,12 +87,13 @@ Open `http://127.0.0.1:8899/settings/access-settings` directly on the server to 
 For unattended deployments, provide the password at startup instead:
 
 ```bash
-HOST=0.0.0.0 CODEX_WEBUI_PASSWORD='use-a-long-random-password' bun run start
+HOST=0.0.0.0 CODEX_WEBUI_PASSWORD='use-a-long-random-password' npm run start
 ```
 
 Save a bound domain in the same settings page to enable remote access. Only direct `127.0.0.1` access is allowed until a domain is bound; other IP addresses, `localhost`, IPv6, and unbound domains are rejected. Domain settings are stored next to the credential file as `codex-webui-auth.json.access.json`. Reverse proxies must preserve the external `Host` or supply an accurate `X-Forwarded-Host`, including the external port when applicable. Only the configured domain is accepted from this forwarded header. Domain binding does not configure DNS or TLS. Remote requests must sign in before the main application bundle, HTTP APIs, or WebSocket bridges are available. Successful authentication uses a signed `HttpOnly`, `SameSite=Strict` session cookie.
 
 `CODEX_WEBUI_ACCESS_TOKEN` remains available for compatibility with Basic/Bearer clients. `CODEX_WEBUI_PASSWORD` takes precedence over both the managed password and access token for browser login. Set `CODEX_WEBUI_AUTH_STORE` to move the managed credential file.
+
 
 Messages wait in a per-thread queue while another Codex app or CLI owns the thread, then send automatically in order. The composer shows pending messages with cancel and retry actions. The queue is stored next to the credential file as `codex-webui-auth.json.queue.json` and survives refreshes and restarts. Messages whose delivery was uncertain during a crash require checking the conversation before retrying.
 
@@ -110,7 +107,7 @@ Copy the example file if you want custom settings:
 cp .env.example .env
 ```
 
-Bun does not automatically load every `.env` convention in all execution contexts, so exporting variables explicitly is the most predictable option:
+Export configuration variables before starting the service:
 
 ```bash
 export HOST=0.0.0.0
@@ -118,7 +115,7 @@ export PORT=8899
 export CODEX_WEBUI_ACCESS_TOKEN="$(openssl rand -hex 32)"
 export CODEX_WEBUI_CWD="$HOME/projects/my-project"
 export CODEX_WEBUI_REVIEW_ROOT="$HOME/projects/my-project"
-bun run start
+npm run start
 ```
 
 | Variable | Default | Description |
@@ -140,7 +137,7 @@ Shared connections let WebUI control the same running threads as local Codex. Ex
 
 ## Security model
 
-Codex WebUI can approve command execution and file changes on your machine. Treat it like a local developer tool with shell access.
+codex-cli-webui can approve command execution and file changes on your machine. Treat it like a local developer tool with shell access.
 
 - Do **not** expose port `8899` directly to the public Internet.
 - The default listener is `127.0.0.1`. A non-localhost listener requires first-run password setup, `CODEX_WEBUI_PASSWORD`, or `CODEX_WEBUI_ACCESS_TOKEN` before protected HTTP and WebSocket requests are accepted.
@@ -178,7 +175,7 @@ The shell mirrors Codex Desktop's separate Bottom Panel, Summary, and Task Side 
 
 ```mermaid
 flowchart LR
-    Browser[Browser UI] <-->|WebSocket JSON-RPC| Server[Bun HTTP + WS server]
+    Browser[Browser UI] <-->|WebSocket JSON-RPC| Server[Node.js HTTP + WS server]
     Server <-->|shared socket / stdio JSON-RPC| Codex[codex app-server]
     Browser <-->|Authenticated terminal WebSocket| PTY[Node PTY worker]
     PTY <-->|xterm-256color| Shell[Local login shell]
@@ -201,13 +198,13 @@ Main files:
 
 `public/app.bundle.js` is generated automatically when the server starts and is not committed.
 
-During development, `bun run dev` watches both `server.ts` and the browser entry graph rooted at `public/app.js`. Backend changes restart the server, while frontend changes rebuild `public/app.bundle.js`; reload the page to use the new bundle.
+During development, `npm run dev` watches both `server.ts` and the browser entry graph rooted at `public/app.js`. Backend changes restart the server, while frontend changes rebuild `public/app.bundle.js`; reload the page to use the new bundle.
 
 Build the browser bundle and a runnable `dist/server.js`:
 
 ```bash
-bun run build
-bun dist/server.js
+npm run build
+node dist/server.js
 ```
 
 ## Docker
@@ -227,32 +224,32 @@ The Compose example does not mount the host Docker socket. The image runs as the
 Install Playwright's Chromium if you do not already have a compatible Chrome/Edge binary:
 
 ```bash
-bunx playwright install chromium
+npx playwright install chromium
 ```
 
 Run the portable unit suite:
 
 ```bash
-bun run test:unit
+npm run test:unit
 ```
 
-Check both Bun and browser bundles:
+Check server and browser syntax:
 
 ```bash
-bun run check
+npm run check
 ```
 
 With a running server:
 
 ```bash
-bun run test:browser
+npm run test:browser
 ```
 
 Tests that require a working, authenticated Codex installation:
 
 ```bash
-bun run test:integration
-bun run test:e2e
+npm run test:integration
+npm run test:e2e
 ```
 
 The real approval E2E asks Codex to execute a harmless command, waits for the actual approval request, clicks **Allow once**, verifies the result, and cleans up its temporary file.

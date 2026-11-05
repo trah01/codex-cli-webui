@@ -10,8 +10,8 @@
 
 ## Verification
 
-- [ ] `bun run test:unit`
-- [ ] `bun run check`
+- [ ] `npm run test:unit`
+- [ ] `npm run check`
 - [ ] Relevant browser tests
 - [ ] Relevant integration/E2E tests
 - [ ] `git diff --check`

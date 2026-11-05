@@ -91,7 +91,7 @@ export async function fetchCodexProfile(options: FetchCodexProfileOptions = {}):
   const headers = new Headers({
     authorization: `Bearer ${accessToken}`,
     accept: "application/json",
-    "user-agent": "Codex WebUI",
+    "user-agent": "codex-cli-webui",
   });
   if (accountId) headers.set("chatgpt-account-id", accountId);
 

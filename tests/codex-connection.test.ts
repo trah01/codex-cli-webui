@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { createCodexConnection, resolveCodexConnection } from '../codex-connection.js';
 

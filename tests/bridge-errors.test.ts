@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { THREAD_ACTIVE_WRITER, THREAD_NOT_FOUND, bridgeErrorCode, createBridgeError, rpcErrorPayload, threadInputErrorMessage } from "../public/bridge-errors.js";
 
 describe("Codex bridge errors", () => {

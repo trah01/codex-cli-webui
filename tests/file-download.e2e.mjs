@@ -1,3 +1,4 @@
+import { startProcess } from './process-runtime.mjs';
 import { createServer } from 'node:net';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -13,14 +14,14 @@ const fixtureRoot=mkdtempSync(join(tmpdir(),'codex-webui-download-'));
 const fixture=join(fixtureRoot,"agent's result.txt");
 const body='downloaded from the Codex conversation\n';
 writeFileSync(fixture,body);
-const server=Bun.spawn(['bun','run','server.ts'],{cwd:root,env:{...process.env,HOST:'127.0.0.1',PORT:String(port)},stdout:'ignore',stderr:'ignore'});
+const server=startProcess([process.execPath,'--import','tsx','server.ts'],{cwd:root,env:{...process.env,HOST:'127.0.0.1',PORT:String(port)},stdout:'ignore',stderr:'ignore'});
 let browser;
 
 try{
   for(let attempt=0;attempt<80;attempt++){
     try{if((await fetch(`${base}/api/health`)).ok)break}catch{}
     if(attempt===79)throw new Error('File download test server did not become ready');
-    await Bun.sleep(100);
+    await new Promise(resolve => setTimeout(resolve, 100));
   }
 
   const direct=await fetch(`${base}/api/files/download?path=${encodeURIComponent(fixture)}&cwd=${encodeURIComponent(fixtureRoot)}`);

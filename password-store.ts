@@ -26,7 +26,7 @@ export function loadStoredPassword(path: string): StoredPassword | null {
     throw error;
   }
   const credential = JSON.parse(raw);
-  if (!isStoredPassword(credential)) throw new Error(`Invalid Codex WebUI password store: ${path}`);
+  if (!isStoredPassword(credential)) throw new Error(`Invalid codex-cli-webui password store: ${path}`);
   return credential;
 }
 

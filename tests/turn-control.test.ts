@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { interruptThread } from '../turn-control.js';
 
 test('interrupts the exact requested turn without resuming an already loaded thread', async () => {

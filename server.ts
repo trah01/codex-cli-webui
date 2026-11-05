@@ -1,4 +1,6 @@
 import { createReadStream, existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { build } from "esbuild";
 import { join, relative, resolve, extname } from "node:path";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { networkInterfaces, tmpdir } from "node:os";
@@ -58,7 +60,8 @@ let managedPassword: StoredPassword | null = environmentPassword || accessToken 
 let authSecret = environmentPassword || accessToken || storedPasswordSessionSecret(managedPassword);
 let passwordSetupInProgress = false;
 const localhostOnly = host === "127.0.0.1" || host === "::1" || host === "localhost";
-const appRoot = existsSync(resolve(import.meta.dir, "public")) ? import.meta.dir : resolve(import.meta.dir, "..");
+const moduleDir = fileURLToPath(new URL(".", import.meta.url));
+const appRoot = existsSync(resolve(moduleDir, "public")) ? moduleDir : resolve(moduleDir, "..");
 const publicDir = resolve(appRoot, "public");
 const homeDir = process.env.HOME || process.cwd();
 const projectless = process.env.CODEX_WEBUI_PROJECTLESS === "true";
@@ -102,7 +105,7 @@ const codexConnection = createCodexConnection({
   onConnect: () => {
     connected = false;
     initialize().catch(error => {
-      console.error("[codex-webui] initialize failed", error.message);
+      console.error("[codex-cli-webui] initialize failed", error.message);
       terminateCodex();
     });
   },
@@ -130,7 +133,7 @@ function maybeFinishShutdown() {
 }
 
 function sendRaw(message: any) {
-  if (shuttingDown) throw new Error("Codex WebUI is shutting down");
+  if (shuttingDown) throw new Error("codex-cli-webui is shutting down");
   startCodex();
   codexConnection.send(message);
 }
@@ -152,7 +155,7 @@ function request(method: string, params: any = {}) {
 
 async function initialize() {
   const result = await request("initialize", {
-    clientInfo: { name: "codex-webui", title: "Codex WebUI", version: "0.2.0" },
+    clientInfo: { name: "codex-cli-webui", title: "codex-cli-webui", version: "0.2.0" },
     capabilities: { experimentalApi: true },
   });
   sendRaw({ method: "initialized", params: {} });
@@ -490,7 +493,7 @@ const server = createServer(async (req, res) => {
       for (const client of terminalSessions.keys()) client.close(1008, "Account settings changed");
       for (const stream of sseClients) stream.end();
     } catch (error: any) {
-      console.error("[codex-webui] account settings save failed", error?.code || "write error");
+      console.error("[codex-cli-webui] account settings save failed", error?.code || "write error");
       sendAuthError(res, error?.code === "EEXIST" ? 409 : 500, "Unable to save account settings");
     } finally { passwordSetupInProgress = false; }
     return;
@@ -717,7 +720,7 @@ const server = createServer(async (req, res) => {
       });
       res.end(avatar.body);
     } catch (error) {
-      console.warn("[codex-webui] account request failed:", error instanceof Error ? error.message : String(error));
+      console.warn("[codex-cli-webui] account request failed:", error instanceof Error ? error.message : String(error));
       if (editing) {
         sendAuthError(res, 500, "Could not save profile. Try again.");
         return;
@@ -828,7 +831,7 @@ server.on("upgrade", (req, socket, head) => {
     socket.end([
       "HTTP/1.1 401 Unauthorized",
       "Connection: close",
-      'WWW-Authenticate: Basic realm="Codex WebUI", charset="UTF-8"',
+      'WWW-Authenticate: Basic realm="codex-cli-webui", charset="UTF-8"',
       "Content-Type: application/json; charset=utf-8",
       `Content-Length: ${Buffer.byteLength(body)}`,
       "X-Content-Type-Options: nosniff",
@@ -868,7 +871,7 @@ terminalWss.on("connection", (client, req) => {
     });
     terminalSessions.set(client, terminal);
   } catch (error) {
-    console.error("[codex-webui] terminal failed", error);
+    console.error("[codex-cli-webui] terminal failed", error);
     client.close(1011, "Terminal unavailable");
     return;
   }
@@ -891,20 +894,20 @@ terminalWss.on("connection", (client, req) => {
   client.on("error", () => client.close());
 });
 
-const frontendBuild = await Bun.build({
-  entrypoints: [resolve(publicDir, "app.js")],
-  outdir: publicDir,
-  naming: "app.bundle.js",
-  target: "browser",
+await build({
+  entryPoints: [resolve(publicDir, "app.js")],
+  outfile: resolve(publicDir, "app.bundle.js"),
+  bundle: true,
+  platform: "browser",
+  format: "esm",
   minify: false,
 });
-if (!frontendBuild.success) throw new Error(`Frontend build failed: ${frontendBuild.logs.join("\n")}`);
 
 startCodex();
 server.listen(port, host, () => {
-  console.log(`Codex WebUI listening on http://${host}:${port}`);
-  console.log(`[codex-webui] Codex connection: ${codexConnection.kind}`);
-  if (passwordSetupRequired()) console.warn(`[codex-webui] Configure public access credentials at http://127.0.0.1:${port}/settings/access-settings`);
+  console.log(`codex-cli-webui listening on http://${host}:${port}`);
+  console.log(`[codex-cli-webui] Codex connection: ${codexConnection.kind}`);
+  if (passwordSetupRequired()) console.warn(`[codex-cli-webui] Configure public access credentials at http://127.0.0.1:${port}/settings/access-settings`);
   if (!localhostOnly) {
     const addresses = Object.values(networkInterfaces()).flat().filter((entry): entry is NonNullable<typeof entry> => !!entry && entry.family === "IPv4" && !entry.internal);
     for (const entry of addresses) console.log(`LAN: http://${entry.address}:${port} (authentication required)`);
@@ -919,7 +922,7 @@ function shutdown() {
   if (restartTimer) clearTimeout(restartTimer);
   restartTimer = null;
   clearInterval(sseKeepalive);
-  for (const item of pending.values()) item.reject(new Error("Codex WebUI is shutting down"));
+  for (const item of pending.values()) item.reject(new Error("codex-cli-webui is shutting down"));
   pending.clear();
   for (const client of clients) client.terminate();
   clients.clear();

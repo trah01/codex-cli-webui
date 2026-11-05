@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import {
   buildApprovalModel,
   parseUnifiedDiff,
@@ -13,10 +13,10 @@ describe("Codex approval surfaces", () => {
     const model = buildApprovalModel({
       method: "item/commandExecution/requestApproval",
       params: {
-        command: "bun test tests/ui.test.ts",
+        command: "npm test tests/ui.test.ts",
         cwd: "/home/test-user/projects/codex-webui",
         reason: "Run the focused test suite",
-        proposedExecpolicyAmendment: ["bun", "test"],
+        proposedExecpolicyAmendment: ["npm", "test"],
         availableDecisions: ["accept", "acceptForSession", "decline", "cancel"],
       },
     });
@@ -26,7 +26,7 @@ describe("Codex approval surfaces", () => {
     expect(model.primary.label).toBe("Allow once");
     expect(model.scoped?.label).toBe("Allow similar commands");
     expect(model.scoped?.decision).toEqual({
-      acceptWithExecpolicyAmendment: { execpolicy_amendment: ["bun", "test"] },
+      acceptWithExecpolicyAmendment: { execpolicy_amendment: ["npm", "test"] },
     });
     expect(model.deny.decision).toBe("decline");
     expect(model.cancel).toBeNull();
@@ -124,7 +124,7 @@ describe("Codex review controls", () => {
 
 describe("Codex execution state", () => {
   test("uses active and completed copy driven by item status", () => {
-    expect(summarizeActivity({ type: "commandExecution", status: "inProgress", command: "bun test" })).toMatchObject({ label: "Running command", active: true, animation: "run-command" });
+    expect(summarizeActivity({ type: "commandExecution", status: "inProgress", command: "npm test" })).toMatchObject({ label: "Running command", active: true, animation: "run-command" });
     expect(summarizeActivity({ type: "fileChange", status: "completed", changes: [{ path: "a.ts" }] })).toMatchObject({ label: "Edited a file", active: false, animation: "edit-files" });
     expect(summarizeActivity({ type: "webSearch", status: "failed", query: "Codex" })).toMatchObject({ label: "Search failed", active: false, tone: "error" });
     expect(summarizeActivity({ type: "imageView", status: "completed", imagePaths: ["/tmp/result.png"] })).toMatchObject({ label: "Viewed image", detail: "/tmp/result.png", category: "image", active: false });

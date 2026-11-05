@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { codexInterfaceMark } from "../public/codex-brand.js";
 import { codexIcon, codexIconNodes, hydrateCodexIcons } from "../public/codex-icons.js";
 

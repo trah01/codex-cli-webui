@@ -21,7 +21,7 @@ const port=await new Promise((resolvePort,reject)=>{
 
 let output='';
 let browser;
-const dev=spawn('bun',['run','dev'],{
+const dev=spawn(process.execPath,['--import','tsx','dev.ts'],{
   cwd:root,
   env:{...process.env,HOST:'127.0.0.1',PORT:String(port),CODEX_WEBUI_PASSWORD:'',CODEX_WEBUI_ACCESS_TOKEN:''},
   stdio:['ignore','pipe','pipe'],
@@ -59,7 +59,7 @@ try{
   await page.screenshot({path:'/tmp/codex-webui-dev-watch.png',fullPage:false});
   const result={bundleRebuilt:statSync(bundlePath).mtimeMs>before,health,bundleStatus:bundle.status,bundleBytes:Number(bundle.headers.get('content-length')||0),rendered,errors};
   console.log(JSON.stringify(result,null,2));
-  if(!result.bundleRebuilt||health.ok!==true||bundle.status!==200||result.bundleBytes<100_000||rendered.title!=='Codex WebUI'||!rendered.newTask?.includes('New task')||!rendered.appLoaded||rendered.overlay||errors.length)process.exitCode=1;
+  if(!result.bundleRebuilt||health.ok!==true||bundle.status!==200||result.bundleBytes<100_000||rendered.title!=='codex-cli-webui'||!rendered.newTask?.includes('New task')||!rendered.appLoaded||rendered.overlay||errors.length)process.exitCode=1;
 }finally{
   await browser?.close().catch(()=>{});
   dev.kill('SIGTERM');

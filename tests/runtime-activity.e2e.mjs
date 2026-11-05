@@ -12,7 +12,7 @@ await page.waitForFunction(()=>globalThis.__codexWebuiDebug?.notify);
 await page.evaluate(()=>{
   const api=globalThis.__codexWebuiDebug;
   api.state.active={id:'runtime-thread',name:'Runtime thread',cwd:api.state.config.defaultCwd,turns:[]};
-  api.notify('item/started',{turnId:'runtime-turn',item:{id:'runtime-command',type:'commandExecution',command:'bun test'}});
+  api.notify('item/started',{turnId:'runtime-turn',item:{id:'runtime-command',type:'commandExecution',command:'npm test'}});
   api.notify('item/commandExecution/outputDelta',{turnId:'runtime-turn',itemId:'runtime-command',delta:'starting tests\n'});
   api.notify('item/started',{turnId:'runtime-turn',item:{id:'runtime-interactive',type:'commandExecution',command:'',commandActions:[]}});
   api.notify('item/commandExecution/terminalInteraction',{turnId:'runtime-turn',itemId:'runtime-interactive',processId:'pty-1',stdin:'echo interactive\r'});
@@ -40,7 +40,7 @@ const completedLabel=await page.locator('[data-item-id="runtime-file"] .activity
 await page.evaluate(()=>{
   const api=globalThis.__codexWebuiDebug;
   api.syncTurnSnapshot({id:'synced-turn',status:'inProgress',itemsView:'full',items:[
-    {id:'synced-command',type:'commandExecution',status:'inProgress',command:'bun run build',aggregatedOutput:'building\n'},
+    {id:'synced-command',type:'commandExecution',status:'inProgress',command:'npm run build',aggregatedOutput:'building\n'},
     {id:'synced-user',type:'userMessage',content:[{type:'text',text:'Steer this task from the CLI.'}]},
     {id:'synced-file',type:'fileChange',status:'completed',changes:[{path:'/tmp/host-live.ts',kind:{type:'update'},diff:'@@ -1 +1 @@\n-export const live = false;\n+export const live = true;'}]},
   ]});
@@ -49,7 +49,7 @@ await page.click('[data-item-id="synced-command"]');
 await page.evaluate(()=>{
   const api=globalThis.__codexWebuiDebug;
   api.syncTurnSnapshot({id:'synced-turn',status:'inProgress',itemsView:'full',items:[
-    {id:'synced-command',type:'commandExecution',status:'inProgress',command:'bun run build',aggregatedOutput:'building\nbundled\n'},
+    {id:'synced-command',type:'commandExecution',status:'inProgress',command:'npm run build',aggregatedOutput:'building\nbundled\n'},
     {id:'synced-user',type:'userMessage',content:[{type:'text',text:'Steer this task from the CLI.'}]},
     {id:'synced-file',type:'fileChange',status:'completed',changes:[{path:'/tmp/host-live.ts',kind:{type:'update'},diff:'@@ -1 +1 @@\n-export const live = false;\n+export const live = true;'}]},
   ]});
@@ -69,7 +69,7 @@ const syncing=await page.evaluate(()=>({
 }));
 await page.evaluate(()=>{
   const api=globalThis.__codexWebuiDebug;
-  api.syncTurnSnapshot({id:'synced-turn',status:'completed',itemsView:'full',items:[{id:'synced-command',type:'commandExecution',status:'completed',command:'bun run build',aggregatedOutput:'building\nbundled\n',exitCode:0}]});
+  api.syncTurnSnapshot({id:'synced-turn',status:'completed',itemsView:'full',items:[{id:'synced-command',type:'commandExecution',status:'completed',command:'npm run build',aggregatedOutput:'building\nbundled\n',exitCode:0}]});
 });
 await page.click('#toggleSidePanel');
 await page.click('#reviewTab');

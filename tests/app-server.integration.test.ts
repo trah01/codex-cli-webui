@@ -1,13 +1,14 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { spawn, type Subprocess } from "bun";
+import { startProcess } from './process-runtime.mjs';
+import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { text } from "node:stream/consumers";
 import { createServer } from "node:net";
-import { rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import WebSocket from "ws";
 
 const ROOT = new URL("..", import.meta.url).pathname;
 let port = 0;
-let proc: Subprocess;
+let proc: ReturnType<typeof startProcess>;
 let ws: WebSocket;
 let seq = 1;
 const pending = new Map<number, { resolve: (value: any) => void; reject: (error: Error) => void }>();
@@ -59,9 +60,9 @@ async function rejectedWebSocketStatus() {
     socket.on('error', error => { const message=String(error); if(/socket hang up|401/.test(message)){process.stdout.write('rejected');process.exit(0)} process.stderr.write(message); process.exit(3); });
     setTimeout(() => process.exit(4), 5000);
   `;
-  const child = Bun.spawn(["node", "-e", script], { cwd: ROOT, stdout: "pipe", stderr: "pipe" });
-  const output = await new Response(child.stdout).text();
-  const error = await new Response(child.stderr).text();
+  const child = startProcess(["node", "-e", script], { cwd: ROOT, stdout: "pipe", stderr: "pipe" });
+  const output = await text(child.stdout);
+  const error = await text(child.stderr);
   const code = await child.exited;
   if (code !== 0) throw new Error(`WebSocket rejection probe failed (${code}): ${error}`);
   return output.trim();
@@ -69,8 +70,7 @@ async function rejectedWebSocketStatus() {
 
 beforeAll(async () => {
   port = await freePort();
-  proc = spawn({
-    cmd: ["bun", "run", "server.ts"],
+  proc = startProcess([process.execPath, "--import", "tsx", "server.ts"], {
     cwd: ROOT,
     env: { ...process.env, PORT: String(port), HOST: "127.0.0.1", CODEX_WEBUI_PASSWORD: "", CODEX_WEBUI_ACCESS_TOKEN: "integration-access-token" },
     stdout: "pipe",
@@ -110,7 +110,7 @@ afterAll(async () => {
   }
 });
 
-describe("Codex WebUI app-server bridge", () => {
+describe("codex-cli-webui app-server bridge", () => {
   test("requires authentication when a reverse proxy supplies a non-localhost host", async () => {
     const denied = await fetch(`http://127.0.0.1:${port}/api/health`, { headers: { host: "codex.example.com" } });
     expect(denied.status).toBe(401);
@@ -139,11 +139,11 @@ describe("Codex WebUI app-server bridge", () => {
       rpc("thread/list", { limit: 3, sortKey: "recency_at", sortDirection: "desc" }),
     ]);
     expect(models.data.length).toBeGreaterThan(0);
-    expect(models.data[0].model).toBeString();
+    expect(models.data[0].model).toBeTypeOf("string");
     expect(threads.data.length).toBeGreaterThan(0);
-    expect(threads.data[0].id).toBeString();
+    expect(threads.data[0].id).toBeTypeOf("string");
     const live = await rpc("host/thread/live", { threadId: threads.data[0].id });
-    expect(live.active).toBeBoolean();
+    expect(live.active).toBeTypeOf("boolean");
     expect(live.turn === null || live.turn?.status === "inProgress").toBe(true);
   });
 
@@ -155,7 +155,7 @@ describe("Codex WebUI app-server bridge", () => {
       await expect(rpc("fs/readFile", { path: probe })).rejects.toThrow(/not available|not allowed/i);
       await expect(rpc("fs/writeFile", { path: writeProbe, dataBase64: Buffer.from("blocked").toString("base64") })).rejects.toThrow(/not available|not allowed/i);
       await expect(rpc("config/read", {})).rejects.toThrow(/not available|not allowed/i);
-      expect(Bun.file(writeProbe).size).toBe(0);
+      expect(existsSync(writeProbe)).toBe(false);
     } finally {
       rmSync(probe, { force: true });
       rmSync(writeProbe, { force: true });

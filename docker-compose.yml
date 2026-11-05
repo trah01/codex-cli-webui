@@ -1,14 +1,14 @@
 services:
-  codex-webui:
+  codex-cli-webui:
     build:
       context: .
       dockerfile: Dockerfile
-    image: codex-webui-lezi-fun:local
-    container_name: codex-webui-lezi-fun
+    image: codex-cli-webui:local
+    container_name: codex-cli-webui
     restart: unless-stopped
     user: "${PUID:-1000}:${PGID:-1000}"
     working_dir: /app
-    command: ["bun", "run", "start"]
+    command: ["npm", "start"]
     ports:
       - "${WEBUI_BIND_IP:-127.0.0.1}:8899:8899"
     environment:
@@ -21,9 +21,9 @@ services:
       TZ: "${TZ:-Europe/Rome}"
     volumes:
       - .:/app
-      - codex_webui_node_modules:/app/node_modules
+      - codex_cli_webui_node_modules:/app/node_modules
       - ${CODEX_HOME_HOST:-${HOME}/.codex}:${CONTAINER_CODEX_HOME:-/home/codex/.codex}
       - ${CODEX_BIN:?Set CODEX_BIN to the Codex executable path}:/usr/local/bin/codex:ro
 
 volumes:
-  codex_webui_node_modules:
+  codex_cli_webui_node_modules:

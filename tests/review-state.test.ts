@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { ReviewDiffStore, parseReviewPatchRequest } from "../review-state.js";
 
 describe("server-owned review state", () => {

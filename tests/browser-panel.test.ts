@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { browserSandboxFor, normalizeBrowserUrl } from "../public/browser-panel.js";
 
 describe("browser panel URLs", () => {

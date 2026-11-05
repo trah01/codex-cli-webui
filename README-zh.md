@@ -1,4 +1,4 @@
-# Codex WebUI
+# codex-cli-webui
 
 <p align="center">
   <strong>由真实 Codex app-server 驱动、可在局域网访问的本地 WebUI。</strong>
@@ -11,18 +11,16 @@
 </p>
 
 <p align="center">
-  <a href="./LICENSE"><img alt="MIT 许可证" src="https://img.shields.io/github/license/lezi-fun/codex-webui?style=flat-square"></a>
-  <a href="https://github.com/lezi-fun/codex-webui/stargazers"><img alt="GitHub Stars" src="https://img.shields.io/github/stars/lezi-fun/codex-webui?style=flat-square"></a>
-  <a href="https://github.com/lezi-fun/codex-webui/issues"><img alt="GitHub Issues" src="https://img.shields.io/github/issues/lezi-fun/codex-webui?style=flat-square"></a>
-  <a href="https://bun.sh/"><img alt="Bun 1.3 或更高版本" src="https://img.shields.io/badge/Bun-1.3%2B-fbf0df?style=flat-square&amp;logo=bun&amp;logoColor=000"></a>
 </p>
 
 > [!IMPORTANT]
 > 这是一个**非官方社区项目**，与 OpenAI 没有隶属、背书或维护关系。OpenAI、Codex 及相关标识归其各自权利人所有。
 
-Codex WebUI 优先连接本机已有的 Codex 共享后台，未发现共享后台时启动 `codex app-server --stdio`，通过响应式浏览器界面提供本地 Codex 体验。模型列表、历史会话、流式回答、工具活动、审批请求、Diff 和 Token 使用量均来自真实 app-server，而不是前端静态模拟。
+codex-cli-webui 优先连接本机已有的 Codex 共享后台，未发现共享后台时启动 `codex app-server --stdio`，通过响应式浏览器界面提供本地 Codex 体验。模型列表、历史会话、流式回答、工具活动、审批请求、Diff 和 Token 使用量均来自真实 app-server，而不是前端静态模拟。
 
-![Codex WebUI 桌面截图](./docs/assets/overview.png)
+![codex-cli-webui 桌面截图](./docs/assets/overview.png)
+
+基于 [lezi-fun/codex-webui](https://github.com/lezi-fun/codex-webui) 开发，原作者为 lezi-fun，保留原作者版权及 MIT 许可证声明。
 
 ## 主要功能
 
@@ -44,10 +42,11 @@ Codex WebUI 优先连接本机已有的 Codex 共享后台，未发现共享后�
 - 桌面与移动端响应式布局，手机端使用全屏 Summary 与 Task Side Panel 抽屉
 - 默认只监听 localhost；局域网访问需显式启用认证
 
+
+
 ## 环境要求
 
-- [Bun](https://bun.sh/) 1.3 或更高版本
-- Node.js 20 或更高版本，用于原生 PTY worker
+- Node.js 24.22.1 及以上的 24.x，或 26.12.1 及以上的 26.x，以及 npm
 - 已安装并完成登录的 [OpenAI Codex CLI](https://www.npmjs.com/package/@openai/codex)
 - Git，用于 Review 的 Undo/Reapply
 - 推荐 macOS 或 Linux；Windows 尚未完整测试
@@ -64,10 +63,9 @@ codex
 ## 快速开始
 
 ```bash
-git clone https://github.com/lezi-fun/codex-webui.git
-cd codex-webui
-bun install
-bun run start
+cd codex-cli-webui
+npm install
+npm run start
 ```
 
 本机打开：
@@ -83,7 +81,7 @@ http://127.0.0.1:8899
 未配置认证变量时，可以直接监听局域网：
 
 ```bash
-HOST=0.0.0.0 bun run start
+HOST=0.0.0.0 npm run start
 ```
 
 在服务器本机打开 `http://127.0.0.1:8899/settings/access-settings`，设置公网访问使用的账号和密码；密码至少 12 位。账号密码只能通过直接连接的 `127.0.0.1` 页面创建和修改，公网域名、局域网 IP、`localhost`、IPv6 回环地址及代理转发请求均不能操作。凭据保存在 `~/.codex/codex-webui-auth.json`，密码仅保存加盐后的 `scrypt` 哈希；修改后旧会话失效，已连接的会话需要重新登录。未配置时，远程页面只显示本机配置提示。
@@ -91,10 +89,11 @@ HOST=0.0.0.0 bun run start
 无人值守部署也可以在启动时直接指定密码；配置环境变量后，页面不能覆盖该密码：
 
 ```bash
-HOST=0.0.0.0 CODEX_WEBUI_PASSWORD='use-a-long-random-password' bun run start
+HOST=0.0.0.0 CODEX_WEBUI_PASSWORD='use-a-long-random-password' npm run start
 ```
 
 在同一设置页填写绑定域名（例如 `codex.example.com`）并保存。未绑定时仅允许直接通过 `127.0.0.1` 访问；绑定后只允许 `127.0.0.1` 和该域名，其他域名、局域网 IP、`localhost` 和 IPv6 地址均被拒绝。域名配置保存在凭据文件旁的 `codex-webui-auth.json.access.json`，修改域名无需重新设置密码。反向代理应保留外部 `Host`，或传递准确的 `X-Forwarded-Host`（域名及外部端口）；后端只接受与绑定域名匹配的转发地址。域名绑定不替代反向代理和 TLS 配置。远程客户端在登录前，无法访问应用 Bundle、HTTP API 和 WebSocket bridge。认证成功后使用签名的 `HttpOnly`、`SameSite=Strict` 会话 Cookie。
+
 
 会话被其他 Codex 应用或 CLI 占用时，发送的消息会排队等待，空闲后按顺序自动发送。输入框附近可查看、取消排队消息，发送失败后可重试。队列保存在凭据文件旁的 `codex-webui-auth.json.queue.json`，刷新页面或正常重启后仍会保留；若异常退出时无法确认发送结果，会提示先检查对话再重试。
 
@@ -116,7 +115,7 @@ export PORT=8899
 export CODEX_WEBUI_ACCESS_TOKEN="$(openssl rand -hex 32)"
 export CODEX_WEBUI_CWD="$HOME/projects/my-project"
 export CODEX_WEBUI_REVIEW_ROOT="$HOME/projects/my-project"
-bun run start
+npm run start
 ```
 
 | 变量 | 默认值 | 说明 |
@@ -138,7 +137,7 @@ bun run start
 
 ## 安全模型
 
-Codex WebUI 可以在本机批准执行命令和修改文件，应把它视为拥有 Shell 能力的本地开发工具。
+codex-cli-webui 可以在本机批准执行命令和修改文件，应把它视为拥有 Shell 能力的本地开发工具。
 
 - 不要把 `8899` 端口直接暴露到公网。
 - 默认只监听 `127.0.0.1`。监听非 localhost 地址时，必须先在本机设置准入账号密码，或配置 `CODEX_WEBUI_PASSWORD` / `CODEX_WEBUI_ACCESS_TOKEN`，并在本机设置中绑定访问域名，受保护的 HTTP 与 WebSocket 请求才会放行。
@@ -176,7 +175,7 @@ Undo/Reapply 被严格限制在配置的仓库根目录中。
 
 ```mermaid
 flowchart LR
-    Browser[浏览器 UI] <-->|WebSocket JSON-RPC| Server[Bun HTTP + WS 服务]
+    Browser[浏览器 UI] <-->|WebSocket JSON-RPC| Server[Node.js HTTP + WS 服务]
     Server <-->|shared socket / stdio JSON-RPC| Codex[codex app-server]
     Browser <-->|受认证保护的终端 WebSocket| PTY[Node PTY worker]
     PTY <-->|xterm-256color| Shell[本地登录 Shell]
@@ -199,13 +198,13 @@ flowchart LR
 
 `public/app.bundle.js` 会在服务启动时自动生成，不提交到 Git。
 
-开发时使用 `bun run dev` 会同时监听 `server.ts` 和以 `public/app.js` 为入口的浏览器依赖图。后端变化会重启服务，前端变化会重建 `public/app.bundle.js`；刷新网页即可加载新 Bundle。
+开发时使用 `npm run dev` 会同时监听 `server.ts` 和以 `public/app.js` 为入口的浏览器依赖图。后端变化会重启服务，前端变化会重建 `public/app.bundle.js`；刷新网页即可加载新 Bundle。
 
 生成可直接运行的浏览器 Bundle 和 `dist/server.js`：
 
 ```bash
-bun run build
-bun dist/server.js
+npm run build
+node dist/server.js
 ```
 
 ## 测试
@@ -213,32 +212,32 @@ bun dist/server.js
 如果本机没有兼容的 Chrome/Edge，可安装 Playwright Chromium：
 
 ```bash
-bunx playwright install chromium
+npx playwright install chromium
 ```
 
 运行可移植单元测试：
 
 ```bash
-bun run test:unit
+npm run test:unit
 ```
 
-检查后端和浏览器 Bundle：
+检查后端和浏览器代码语法：
 
 ```bash
-bun run check
+npm run check
 ```
 
 服务运行时执行浏览器测试：
 
 ```bash
-bun run test:browser
+npm run test:browser
 ```
 
 以下测试需要可用且已登录的 Codex：
 
 ```bash
-bun run test:integration
-bun run test:e2e
+npm run test:integration
+npm run test:e2e
 ```
 
 真实审批 E2E 会让 Codex 请求执行一条无害命令，等待真实审批框，点击 **Allow once**，验证执行结果并清理临时文件。

@@ -31,14 +31,14 @@ await page.evaluate(async()=>{
  document.querySelector('#conversation').innerHTML='<article class="turn user-turn"><div class="user-message">Add a responsive settings panel, run the checks, and show me the changes.</div></article>';
  api.notify('item/completed',{turnId:'readme-complete',item:{id:'readme-commentary',type:'agentMessage',phase:'commentary',text:'I’ll update the settings layout, run the checks, and review the resulting diff.'}});
  api.notify('item/completed',{turnId:'readme-complete',item:{id:'readme-edit',type:'fileChange',status:'completed',changes:[{path:`${demo}/src/settings.ts`,additions:3,deletions:1}]}});
- api.notify('item/completed',{turnId:'readme-complete',item:{id:'readme-test',type:'commandExecution',status:'completed',command:'bun test',aggregatedOutput:'12 tests passed'}});
- api.notify('item/completed',{turnId:'readme-complete',item:{id:'readme-check',type:'commandExecution',status:'completed',command:'bun run check',aggregatedOutput:'Browser and server bundles verified'}});
+ api.notify('item/completed',{turnId:'readme-complete',item:{id:'readme-test',type:'commandExecution',status:'completed',command:'npm test',aggregatedOutput:'12 tests passed'}});
+ api.notify('item/completed',{turnId:'readme-complete',item:{id:'readme-check',type:'commandExecution',status:'completed',command:'npm run check',aggregatedOutput:'Browser and server bundles verified'}});
  api.notify('item/completed',{turnId:'readme-complete',item:{id:'readme-agent',type:'agentMessage',text:'Updated the settings configuration for the responsive layout.\n\n- Enabled compact mode and added responsive and system-theme settings.\n- Verified the focused tests and the full browser/server bundle check.'}});
  api.notify('turn/completed',{turn:{id:'readme-complete',durationMs:8400,items:[
    {id:'readme-commentary',type:'agentMessage',phase:'commentary',text:'I’ll update the settings layout, run the checks, and review the resulting diff.'},
    {id:'readme-edit',type:'fileChange',status:'completed',changes:[{path:`${demo}/src/settings.ts`,additions:3,deletions:1}]},
-   {id:'readme-test',type:'commandExecution',status:'completed',command:'bun test',aggregatedOutput:'12 tests passed'},
-   {id:'readme-check',type:'commandExecution',status:'completed',command:'bun run check',aggregatedOutput:'Browser and server bundles verified'},
+   {id:'readme-test',type:'commandExecution',status:'completed',command:'npm test',aggregatedOutput:'12 tests passed'},
+   {id:'readme-check',type:'commandExecution',status:'completed',command:'npm run check',aggregatedOutput:'Browser and server bundles verified'},
    {id:'readme-agent',type:'agentMessage',text:'Updated the settings configuration for the responsive layout.\n\n- Enabled compact mode and added responsive and system-theme settings.\n- Verified the focused tests and the full browser/server bundle check.'},
  ]}});
  api.notify('turn/diff/updated',{turnId:'readme-complete',threadId:'readme-thread',diff:'diff --git a/src/settings.ts b/src/settings.ts\n--- a/src/settings.ts\n+++ b/src/settings.ts\n@@ -1,3 +1,5 @@\n export const settings = {\n-  compact: false,\n+  compact: true,\n+  responsive: true,\n+  theme: "system",\n };\n'});

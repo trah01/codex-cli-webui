@@ -1,17 +1,19 @@
 import { existsSync, lstatSync, realpathSync } from "node:fs";
 import { resolve, sep } from "node:path";
+import { spawnSync } from "node:child_process";
 
 const inside = (path, root) => path === root || path.startsWith(root.endsWith(sep) ? root : root + sep);
 
 function runGit(cwd, args, input) {
-  const result = Bun.spawnSync(["git", ...args], {
+  const result = spawnSync("git", args, {
     cwd,
-    stdin: input == null ? undefined : new TextEncoder().encode(input),
-    stdout: "pipe",
-    stderr: "pipe",
+    input,
+    encoding: "utf8",
+    maxBuffer: 32 * 1024 * 1024,
   });
-  if (result.exitCode !== 0) throw new Error(result.stderr.toString().trim() || `git ${args.join(" ")} failed`);
-  return result.stdout.toString().trim();
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw new Error(result.stderr.trim() || `git ${args.join(" ")} failed`);
+  return result.stdout.trim();
 }
 
 function validateReviewDiffShape(diff) {

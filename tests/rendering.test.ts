@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { agentMessageText, isImageReference, itemImageReferences, localDownloadUrl, localImageUrl, parseFileReference, renderAssistantMarkdown, renderItemImages } from "../public/rendering.js";
 
 describe("assistant Markdown and LaTeX rendering", () => {

@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -65,8 +65,8 @@ describe("Desktop-style live session reader", () => {
     const path = join(directory, "rollout.jsonl");
     const store = new LiveSessionStore();
     try {
-      writeFileSync(path, line("event_msg", { type: "task_started", turn_id: "turn-2", started_at: 20 }) + line("response_item", { type: "custom_tool_call", id: "tool-2", call_id: "call-2", name: "exec", input: 'const r=await tools.exec_command({cmd:"bun test"}); text(r);' }));
-      expect(store.read(path).turn.items[0]).toMatchObject({ command: "bun test", status: "inProgress" });
+      writeFileSync(path, line("event_msg", { type: "task_started", turn_id: "turn-2", started_at: 20 }) + line("response_item", { type: "custom_tool_call", id: "tool-2", call_id: "call-2", name: "exec", input: 'const r=await tools.exec_command({cmd:"npm test"}); text(r);' }));
+      expect(store.read(path).turn.items[0]).toMatchObject({ command: "npm test", status: "inProgress" });
       appendFileSync(path, line("response_item", { type: "custom_tool_call_output", call_id: "call-2", output: [{ type: "input_text", text: "Script completed\nWall time 1.0 seconds\nOutput:\n" }, { type: "input_text", text: '{"exit_code":0,"output":"2 pass\\n"}' }] }));
       expect(store.read(path).turn.items[0]).toMatchObject({ status: "completed", aggregatedOutput: "2 pass\n", exitCode: 0 });
       appendFileSync(path, line("event_msg", { type: "task_complete", turn_id: "turn-2", completed_at: 22 }));

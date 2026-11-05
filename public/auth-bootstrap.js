@@ -21,7 +21,7 @@ async function start(){
     const response=await fetch('/api/auth/status',{cache:'no-store'});
     if(!response.ok)throw new Error(`Authentication status failed (${response.status})`);
     status=await response.json();
-  }catch(reason){console.error('[codex-webui] authentication status failed',reason);return}
+  }catch(reason){console.error('[codex-cli-webui] authentication status failed',reason);return}
   if(status.authenticated||(!status.setupRequired&&!status.passwordRequired)){await loadApp();return}
   const gate=$('#passwordGate'),app=$('#app'),input=$('#passwordInput'),confirmInput=$('#passwordConfirmInput'),form=$('#passwordLoginForm'),button=$('#passwordLoginButton'),error=$('#passwordError'),title=$('#passwordTitle');
   let mode=status.setupRequired?'setup':'login';
@@ -30,7 +30,7 @@ async function start(){
   const configure=()=>{
     const setup=mode==='setup';
     title.textContent=t(setup?'Set a LAN password':'Log in');
-    gate.setAttribute('aria-label',t(setup?'Codex WebUI password setup':'Codex WebUI login'));
+    gate.setAttribute('aria-label',t(setup?'codex-cli-webui password setup':'codex-cli-webui login'));
     input.placeholder=t(setup?'New password':'Password');
     input.autocomplete=setup?'new-password':'current-password';
     input.minLength=setup?12:0;
@@ -65,4 +65,4 @@ async function start(){
   };
 }
 
-start().catch(error=>console.error('[codex-webui] authentication bootstrap failed',error));
+start().catch(error=>console.error('[codex-cli-webui] authentication bootstrap failed',error));

@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { buildTurnInput, IMAGE_MAX_BYTES, TURN_REQUEST_MAX_BYTES, validateImageInputs } from '../public/composer-input.js';
 
 const url = 'data:image/png;base64,iVBORw0KGgo=';

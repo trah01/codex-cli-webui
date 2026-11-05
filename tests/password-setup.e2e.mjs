@@ -27,7 +27,7 @@ const remoteFetch=(url,options={})=>fetch(url.replace(`http://${domain}:`,`http:
 const serverEnv={...process.env,HOST:'0.0.0.0',PORT:String(port),CODEX_WEBUI_PASSWORD:'',CODEX_WEBUI_ACCESS_TOKEN:'',CODEX_WEBUI_AUTH_STORE:storePath};
 
 const startServer=async()=>{
-  const child=spawn('bun',['run','server.ts'],{cwd:root,env:serverEnv,stdio:['ignore','pipe','pipe']});
+  const child=spawn(process.execPath,['--import','tsx','server.ts'],{cwd:root,env:serverEnv,stdio:['ignore','pipe','pipe']});
   child.stdout.resume();child.stderr.resume();
   const started=Date.now();
   while(Date.now()-started<30_000){

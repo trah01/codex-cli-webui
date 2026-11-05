@@ -1,4 +1,5 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { spawnSync } from 'node:child_process';
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vitest";
 import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,8 +11,8 @@ const file = join(fixture, "sample.txt");
 let diff = "";
 
 function git(...args: string[]) {
-  const result = Bun.spawnSync(["git", ...args], { cwd: fixture, stdout: "pipe", stderr: "pipe" });
-  if (result.exitCode !== 0) throw new Error(result.stderr.toString());
+  const result = spawnSync("git", args, { cwd: fixture, stdio: ["ignore", "pipe", "pipe"] });
+  if (result.status !== 0) throw new Error(result.stderr.toString());
   return result.stdout.toString();
 }
 
@@ -19,7 +20,7 @@ beforeAll(() => {
   rmSync(fixture, { recursive: true, force: true });
   mkdirSync(fixture, { recursive: true });
   git("init", "-q");
-  git("config", "user.name", "Codex WebUI Test");
+  git("config", "user.name", "codex-cli-webui Test");
   git("config", "user.email", "codex-webui@test.invalid");
   writeFileSync(file, "before\n");
   git("add", "sample.txt");

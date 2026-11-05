@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <script>if(matchMedia('(max-width:720px)').matches)document.documentElement.classList.add('mobile-device','mobile-layout')</script>
 <meta name="theme-color" content="#181818">
-<title>Codex WebUI</title>
+<title>codex-cli-webui</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/style.css">
 <script src="/auth-bootstrap.js" type="module"></script>
 </head>
 <body>
-<section class="password-gate" id="passwordGate" aria-label="Codex WebUI login" hidden>
+<section class="password-gate" id="passwordGate" aria-label="codex-cli-webui login" hidden>
   <form class="password-login" id="passwordLoginForm">
     <span id="passwordCodexMark"></span>
     <h1 id="passwordTitle">Log in</h1>
@@ -27,7 +27,7 @@
 </section>
 <div id="app" class="app-shell">
   <header class="topbar">
-    <div class="window-brand"><span id="windowCodexMark"></span><strong>Codex</strong></div>
+    <div class="window-brand"><span id="windowCodexMark"></span><strong>codex-cli-webui</strong></div>
     <button class="thread-heading" id="threadHeadingButton" type="button"><span id="threadTitle">New task</span><span id="threadPath"></span><span class="icon-slot mobile-only" data-icon="chevronDown" aria-hidden="true"></span></button>
     <button class="icon-button mobile-only" id="mobileNewTask" type="button" title="New chat" aria-label="New chat"><span class="icon-slot" data-icon="plus"></span></button>
     <button class="icon-button mobile-only" id="mobileToolsButton" type="button" title="More" aria-label="More" aria-expanded="false" aria-controls="topActions"><span class="icon-slot" data-icon="ellipsis"></span></button>
@@ -43,7 +43,7 @@
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-top">
       <div class="sidebar-mode-row">
-        <div class="sidebar-product"><strong>Codex</strong></div>
+        <div class="sidebar-product"><strong>codex-cli-webui</strong></div>
         <button class="sidebar-toolbar-button" id="sidebarSearchButton" type="button" title="Search" aria-label="Search chats" aria-expanded="false" aria-controls="sidebarSearchPanel"><span class="icon-slot" data-icon="search"></span></button>
       </div>
       <div class="sidebar-search-panel" id="sidebarSearchPanel" hidden>
@@ -53,7 +53,7 @@
       <button class="sidebar-row new-task" id="newTask"><span class="icon-slot" data-icon="plus"></span><span>New chat</span><kbd>⌘K</kbd></button>
     </div>
     <div class="sidebar-scroll">
-      <span id="projectName" hidden>codex-webui</span><span id="projectPath" hidden>~/projects/codex-webui</span>
+      <span id="projectName" hidden>codex-cli-webui</span><span id="projectPath" hidden>~/projects/codex-cli-webui</span>
       <button class="sidebar-row projects-button" id="projectButton" type="button"><span class="icon-slot" data-icon="folderOpen"></span><span>Projects</span></button>
       <div class="thread-list" id="threadList"><div class="list-state">Connecting to Codex…</div></div>
     </div>
@@ -106,7 +106,7 @@
         <div class="composer-footer">
           <div class="composer-left">
             <button type="button" class="composer-circle-button add-control" data-composer-control="add" title="Attach images" aria-label="Attach images"><span class="icon-slot" data-icon="plus"></span></button>
-            <button type="button" class="composer-text-button composer-project-control" id="composerProjectButton" data-composer-control="project" aria-label="Project"><span class="icon-slot" data-icon="folderOpen"></span><span id="composerProjectLabel">codex-webui</span><span class="icon-slot chevron" data-icon="chevronDown"></span></button>
+            <button type="button" class="composer-text-button composer-project-control" id="composerProjectButton" data-composer-control="project" aria-label="Project"><span class="icon-slot" data-icon="folderOpen"></span><span id="composerProjectLabel">codex-cli-webui</span><span class="icon-slot chevron" data-icon="chevronDown"></span></button>
             <div class="permission-picker" id="permissionPicker" data-composer-control="approval">
               <button type="button" class="composer-text-button approval-control" id="modeButton" title="Change permissions" aria-haspopup="menu" aria-expanded="false"><span class="icon-slot" data-icon="shield"></span><span class="control-label">Ask for approval</span><span class="icon-slot chevron" data-icon="chevronDown"></span></button>
               <div class="permission-menu" id="permissionMenu" role="menu" aria-label="How should Codex actions be approved?" hidden>
@@ -211,7 +211,7 @@
     <div class="summary-panel-scroll">
       <section class="summary-section">
         <h2 class="summary-section-title">Environment</h2>
-        <div class="summary-row"><span class="icon-slot" data-icon="folderOpen"></span><span id="summaryWorkspace">codex-webui</span></div>
+        <div class="summary-row"><span class="icon-slot" data-icon="folderOpen"></span><span id="summaryWorkspace">codex-cli-webui</span></div>
         <div class="summary-row"><span class="icon-slot" data-icon="gitBranch"></span><span id="summaryBranch">Local workspace</span></div>
       </section>
       <section class="summary-section">

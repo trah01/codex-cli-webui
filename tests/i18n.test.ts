@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { JSDOM } from "jsdom";
 import { LOCALE_STORAGE_KEY, createDomI18n, createI18n, resolveLocale, translate, zhCNMessages } from "../public/i18n.js";
 

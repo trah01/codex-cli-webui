@@ -24,10 +24,10 @@ for(const scheme of ['light','dark']){
     const api=globalThis.__codexWebuiDebug;
     api.state.active={id:'theme-thread',cwd:'/tmp/theme-demo',source:'local'};
     document.querySelector('#conversation').innerHTML='<article class="turn user-turn"><div class="user-message">Review the complete command before approval.</div></article>';
-    api.notify('item/completed',{turnId:'theme-turn',item:{id:'theme-agent',type:'agentMessage',text:'Use `bun test` and read the [verification guide](https://example.com).\n\n```ts\nconst theme = "system";\n```\n\n| Surface | State |\n| --- | --- |\n| Panel | Ready |'}});
-    api.notify('item/started',{turnId:'theme-turn',item:{id:'theme-command',type:'commandExecution',status:'inProgress',command:'bun test tests/theme-colors.e2e.mjs --reporter=verbose',aggregatedOutput:'Theme command output'}});
+    api.notify('item/completed',{turnId:'theme-turn',item:{id:'theme-agent',type:'agentMessage',text:'Use `npm test` and read the [verification guide](https://example.com).\n\n```ts\nconst theme = "system";\n```\n\n| Surface | State |\n| --- | --- |\n| Panel | Ready |'}});
+    api.notify('item/started',{turnId:'theme-turn',item:{id:'theme-command',type:'commandExecution',status:'inProgress',command:'npm test tests/theme-colors.e2e.mjs --reporter=verbose',aggregatedOutput:'Theme command output'}});
     api.notify('turn/diff/updated',{turnId:'theme-turn',threadId:'theme-thread',diff:'diff --git a/src/theme.ts b/src/theme.ts\n--- a/src/theme.ts\n+++ b/src/theme.ts\n@@ -1,2 +1,3 @@\n export const mode = "system";\n-oldSurface();\n+newSurface();\n+export { newSurface };\n'});
-    await api.request({id:'theme-approval',method:'item/commandExecution/requestApproval',params:{threadId:'theme-thread',turnId:'theme-turn',itemId:'theme-command',command:'bun test tests/theme-colors.e2e.mjs --reporter=verbose',cwd:'/tmp/theme-demo',reason:'Verify the complete App color contract.',proposedExecpolicyAmendment:['bun','test']}});
+    await api.request({id:'theme-approval',method:'item/commandExecution/requestApproval',params:{threadId:'theme-thread',turnId:'theme-turn',itemId:'theme-command',command:'npm test tests/theme-colors.e2e.mjs --reporter=verbose',cwd:'/tmp/theme-demo',reason:'Verify the complete App color contract.',proposedExecpolicyAmendment:['npm','test']}});
     document.querySelector('#toast').textContent='Theme verification complete';
     document.querySelector('#toast').classList.add('show');
     const older=document.createElement('button');older.className='load-older';older.textContent='Load earlier messages';document.querySelector('#conversation').prepend(older);

@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { createSettingsService } from '../settings-service.js';
 
 test('settings responses exclude credentials and unknown fields cannot be written', async () => {

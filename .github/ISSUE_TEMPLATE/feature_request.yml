@@ -1,5 +1,5 @@
 name: Feature request
-description: Suggest a focused improvement to Codex WebUI
+description: Suggest a focused improvement to codex-cli-webui
 title: "[Feature]: "
 labels: ["enhancement"]
 body:

@@ -10,9 +10,9 @@ async function run(width,height,name){
  await page.waitForFunction(()=>globalThis.__codexWebuiDebug);
  await page.evaluate(async()=>{
    const api=globalThis.__codexWebuiDebug;
-   api.notify('item/started',{turnId:'turn-demo',item:{id:'cmd-demo',type:'commandExecution',status:'inProgress',command:'bun test tests/codex-surfaces.test.ts'}});
+   api.notify('item/started',{turnId:'turn-demo',item:{id:'cmd-demo',type:'commandExecution',status:'inProgress',command:'npm test tests/codex-surfaces.test.ts'}});
    api.notify('turn/diff/updated',{turnId:'turn-demo',threadId:'thread-demo',diff:'diff --git a/src/app.ts b/src/app.ts\n--- a/src/app.ts\n+++ b/src/app.ts\n@@ -1,2 +1,3 @@\n const app = true;\n-old();\n+next();\n+export { next };\n'});
-   await api.request({id:'approval-demo',method:'item/commandExecution/requestApproval',params:{threadId:'thread-demo',turnId:'turn-demo',itemId:'cmd-demo',command:'bun test tests/codex-surfaces.test.ts',cwd:globalThis.__codexWebuiDebug.state.config.defaultCwd||'.',reason:'Run the focused test suite to verify the UI changes.',proposedExecpolicyAmendment:['bun','test'],startedAtMs:Date.now()}});
+   await api.request({id:'approval-demo',method:'item/commandExecution/requestApproval',params:{threadId:'thread-demo',turnId:'turn-demo',itemId:'cmd-demo',command:'npm test tests/codex-surfaces.test.ts',cwd:globalThis.__codexWebuiDebug.state.config.defaultCwd||'.',reason:'Run the focused test suite to verify the UI changes.',proposedExecpolicyAmendment:['npm','test'],startedAtMs:Date.now()}});
  });
  await page.waitForSelector('[data-codex-approval-surface]');
  await page.waitForSelector('.activity-command-icon svg');
@@ -34,7 +34,7 @@ async function run(width,height,name){
  });
  await page.screenshot({path:artifact(`${name}.png`),fullPage:false});
  console.log(name,JSON.stringify({...result,errors},null,2));
- if(!result.activityIcon||result.reviewFiles!==1||result.commandLines!=='none'||result.commandText!=='bun test tests/codex-surfaces.test.ts'||result.scrollWidth>result.innerWidth||errors.length)throw new Error(`${name} failed`);
+ if(!result.activityIcon||result.reviewFiles!==1||result.commandLines!=='none'||result.commandText!=='npm test tests/codex-surfaces.test.ts'||result.scrollWidth>result.innerWidth||errors.length)throw new Error(`${name} failed`);
  await page.close();
 }
 await run(1280,720,'surfaces-desktop');

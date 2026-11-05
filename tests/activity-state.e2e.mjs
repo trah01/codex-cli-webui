@@ -28,7 +28,7 @@ const reasoning=await page.evaluate(()=>{
 const groupPersistence=await page.evaluate(()=>{
   const api=globalThis.__codexWebuiDebug,{state}=api;
   const reset=()=>{for(const animation of state.motion.values())animation?.destroy?.();for(const key of ['items','turns','activities','activityItems','dividers','motion'])state[key].clear();document.querySelector('#conversation').replaceChildren()};
-  const replay=()=>{api.notify('item/completed',{threadId:'persist-thread',turnId:'persist-turn',item:{id:'persist-command-1',type:'commandExecution',command:'bun test',aggregatedOutput:'ok'}});api.notify('item/completed',{threadId:'persist-thread',turnId:'persist-turn',item:{id:'persist-command-2',type:'commandExecution',command:'bun run check',aggregatedOutput:'ok'}})};
+  const replay=()=>{api.notify('item/completed',{threadId:'persist-thread',turnId:'persist-turn',item:{id:'persist-command-1',type:'commandExecution',command:'npm test',aggregatedOutput:'ok'}});api.notify('item/completed',{threadId:'persist-thread',turnId:'persist-turn',item:{id:'persist-command-2',type:'commandExecution',command:'npm run check',aggregatedOutput:'ok'}})};
   reset();state.active={id:'persist-thread',cwd:'/tmp',source:'local'};replay();
   const firstGroup=document.querySelector('[data-agent-activity-group]'),summary=firstGroup?.querySelector('.activity-summary');summary?.click();
   const storageKey=Object.keys(localStorage).find(key=>key.startsWith('codex-webui-activity-group:persist-thread:persist-turn:persist-command-1'));
@@ -41,7 +41,7 @@ const groupPersistence=await page.evaluate(()=>{
 const reloadPersistenceBefore=await page.evaluate(()=>{
   const api=globalThis.__codexWebuiDebug,{state}=api;
   const reset=()=>{for(const animation of state.motion.values())animation?.destroy?.();for(const key of ['items','turns','activities','activityItems','dividers','motion'])state[key].clear();document.querySelector('#conversation').replaceChildren()};
-  const replay=()=>{api.notify('item/completed',{threadId:'reload-persist-thread',turnId:'reload-persist-turn',item:{id:'reload-command-1',type:'commandExecution',command:'bun test',aggregatedOutput:'tests passed'}});api.notify('item/completed',{threadId:'reload-persist-thread',turnId:'reload-persist-turn',item:{id:'reload-command-2',type:'commandExecution',command:'bun run check',aggregatedOutput:'build passed'}})};
+  const replay=()=>{api.notify('item/completed',{threadId:'reload-persist-thread',turnId:'reload-persist-turn',item:{id:'reload-command-1',type:'commandExecution',command:'npm test',aggregatedOutput:'tests passed'}});api.notify('item/completed',{threadId:'reload-persist-thread',turnId:'reload-persist-turn',item:{id:'reload-command-2',type:'commandExecution',command:'npm run check',aggregatedOutput:'build passed'}})};
   reset();state.active={id:'reload-persist-thread',cwd:'/tmp',source:'local'};replay();
   const group=document.querySelector('[data-agent-activity-group]'),summary=group?.querySelector('.activity-summary'),row=group?.querySelector('[data-item-id="reload-command-1"]');summary?.click();row?.click();api.setSidebarOpen(false);
   const groupKey=Object.keys(localStorage).find(key=>key.startsWith('codex-webui-activity-group:reload-persist-thread:reload-persist-turn:reload-command-1'));
@@ -55,8 +55,8 @@ const reloadPersistenceAfter=await page.evaluate(()=>{
   const api=globalThis.__codexWebuiDebug,{state}=api;
   for(const animation of state.motion.values())animation?.destroy?.();for(const key of ['items','turns','activities','activityItems','dividers','motion'])state[key].clear();document.querySelector('#conversation').replaceChildren();
   state.active={id:'reload-persist-thread',cwd:'/tmp',source:'local'};
-  api.notify('item/completed',{threadId:'reload-persist-thread',turnId:'reload-persist-turn',item:{id:'reload-command-1',type:'commandExecution',command:'bun test',aggregatedOutput:'tests passed'}});
-  api.notify('item/completed',{threadId:'reload-persist-thread',turnId:'reload-persist-turn',item:{id:'reload-command-2',type:'commandExecution',command:'bun run check',aggregatedOutput:'build passed'}});
+  api.notify('item/completed',{threadId:'reload-persist-thread',turnId:'reload-persist-turn',item:{id:'reload-command-1',type:'commandExecution',command:'npm test',aggregatedOutput:'tests passed'}});
+  api.notify('item/completed',{threadId:'reload-persist-thread',turnId:'reload-persist-turn',item:{id:'reload-command-2',type:'commandExecution',command:'npm run check',aggregatedOutput:'build passed'}});
   const group=document.querySelector('[data-agent-activity-group]'),summary=group?.querySelector('.activity-summary'),row=group?.querySelector('[data-item-id="reload-command-1"]'),output=row?.nextElementSibling;
   return{groupOpen:summary?.classList.contains('open')&&group?.querySelector('.activity-items')?.classList.contains('open'),itemExpanded:row?.getAttribute('aria-expanded'),outputVisible:output&&getComputedStyle(output).display!=='none',sidebarOpen:!document.body.classList.contains('sidebar-hidden'),sidebarShadow:getComputedStyle(document.querySelector('#sidebar')).boxShadow};
 });

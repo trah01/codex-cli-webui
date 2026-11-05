@@ -1,48 +1,42 @@
-const root = import.meta.dir;
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { context } from 'esbuild';
 
-const commands = [
-  {
-    name: "frontend",
-    args: ["bun", "build", "public/app.js", "--target=browser", "--outfile=public/app.bundle.js", "--watch", "--no-clear-screen"],
-  },
-  {
-    name: "server",
-    args: ["bun", "--watch", "--no-clear-screen", "server.ts"],
-  },
-];
-
-const children = commands.map(command => ({
-  ...command,
-  process: Bun.spawn(command.args, {
-    cwd: root,
-    env: process.env,
-    stdin: "ignore",
-    stdout: "inherit",
-    stderr: "inherit",
-  }),
-}));
-
+const root = fileURLToPath(new URL('.', import.meta.url));
+const frontend = await context({
+  absWorkingDir: root,
+  entryPoints: ['public/app.js'],
+  outfile: 'public/app.bundle.js',
+  bundle: true,
+  platform: 'browser',
+  format: 'esm',
+  logLevel: 'info',
+});
+await frontend.watch();
+const server = spawn(process.execPath, ['--watch', '--import', 'tsx', 'server.ts'], {
+  cwd: root,
+  env: process.env,
+  stdio: ['ignore', 'inherit', 'inherit'],
+});
 let stopping = false;
-
+const exited = new Promise<number>(resolve => {
+  server.once('error', error => {
+    console.error('[codex-cli-webui] development server failed', error);
+    resolve(1);
+  });
+  server.once('exit', code => resolve(code ?? 1));
+});
 async function stop(code: number) {
   if (stopping) return;
   stopping = true;
-  for (const child of children) {
-    if (child.process.exitCode == null) child.process.kill("SIGTERM");
-  }
-  await Promise.allSettled(children.map(child => child.process.exited));
+  if (server.exitCode === null && server.signalCode === null) server.kill('SIGTERM');
+  await Promise.allSettled([exited, frontend.dispose()]);
   process.exit(code);
 }
-
-process.on("SIGINT", () => { void stop(0); });
-process.on("SIGTERM", () => { void stop(0); });
-
-const exited = await Promise.race(children.map(async child => ({
-  name: child.name,
-  code: await child.process.exited,
-})));
-
+process.on('SIGINT', () => { void stop(0); });
+process.on('SIGTERM', () => { void stop(0); });
+const code = await exited;
 if (!stopping) {
-  console.error(`[codex-webui] ${exited.name} development process exited with code ${exited.code}`);
-  await stop(exited.code || 1);
+  console.error(`[codex-cli-webui] development server exited with code ${code}`);
+  await stop(code || 1);
 }
