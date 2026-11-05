@@ -1,3 +1,4 @@
+import { createAboutService } from './about-service.js';
 import { createPasskeyService } from './passkey-service.js';
 import { createPasskeyRoutes, passkeyRequestContext } from './passkey-routes.js';
 import { createTaskThreadReader, prepareThreadMessage } from './task-context.js';
@@ -55,6 +56,9 @@ import {
 
 import { saveProfileName, validateProfileName, validateProfileAvatar, readProfileAvatar, withProfileName } from "./profile-store.js";
 
+const packageMetadata = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+const appVersion = packageMetadata.version;
+const readAbout = createAboutService({ version: appVersion, projectUrl: packageMetadata.homepage || '', githubRepository: packageMetadata.updateRepository || '' });
 const host = process.env.HOST || "127.0.0.1";
 const port = Number(process.env.PORT || 8899);
 const accessToken = process.env.CODEX_WEBUI_ACCESS_TOKEN || null;
@@ -180,7 +184,7 @@ function request(method: string, params: any = {}) {
 
 async function initialize() {
   const result = await request("initialize", {
-    clientInfo: { name: "codex-cli-webui", title: "codex-cli-webui", version: "0.2.0" },
+    clientInfo: { name: "codex-cli-webui", title: "codex-cli-webui", version: appVersion },
     capabilities: { experimentalApi: true },
   });
   sendRaw({ method: "initialized", params: {} });
@@ -766,7 +770,12 @@ const server = createServer(async (req, res) => {
   }
   if (url.pathname === "/api/health") {
     res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
-    res.end(JSON.stringify({ ok: true, codex: connected, codexBackend: codexConnection.kind, version: "0.2.0" }));
+    res.end(JSON.stringify({ ok: true, codex: connected, codexBackend: codexConnection.kind, version: appVersion }));
+    return;
+  }
+  if (url.pathname === "/api/about" && req.method === 'GET') {
+    res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+    res.end(JSON.stringify(await readAbout()));
     return;
   }
   if (url.pathname === "/api/config") {

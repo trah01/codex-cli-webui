@@ -135,6 +135,24 @@ export function createSettingsEditor(context) {
     if (current !== generation) return;
     container.append(...content.childNodes); autosaves.push(...editors);
   }
+  async function about(container, current) {
+    const loading = text(container, 'Loading…');
+    const response = await fetch('/api/about', { cache: 'no-store' });
+    if (!response.ok) throw new Error('无法读取项目信息。');
+    const info = await response.json();
+    if (current !== generation) return;
+    loading.remove();
+    row(container, '当前版本', document.createTextNode(info.version));
+    if (info.projectUrl) {
+      const link = document.createElement('a'); link.href = info.projectUrl; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = info.projectUrl;
+      row(container, '项目地址', link);
+    }
+    const messages = { available: `有新版本：${info.latestVersion}`, current: '已是最新版本', untagged: 'GitHub 暂无版本标签。', unavailable: '暂时无法检查更新，请稍后再试。', unconfigured: '尚未配置 GitHub 更新地址。' };
+    const status = text(container, messages[info.updateStatus] || messages.unavailable); status.setAttribute('role', 'status');
+    if (info.updateStatus === 'available' && info.updateUrl) {
+      const link = document.createElement('a'); link.className = 'integration-refresh'; link.href = info.updateUrl; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = '查看新版本'; container.append(link);
+    }
+  }
   async function render(page, container) {
     const pending = flushEdits();
     const current = ++generation;
@@ -147,6 +165,7 @@ export function createSettingsEditor(context) {
         const content = document.createElement('div'); await renderPasskeySettings(content, t);
         if (current === generation) container.append(...content.childNodes);
       }
+      else if (page === 'about') await about(container, current);
       else if (page === 'agent') await configuration(container, current);
       else if (page === 'global-instructions') await globalInstructions(container, current);
       else if (page === 'code-review') review(container);

@@ -274,7 +274,7 @@ const settingsPageAliases={general:'general-settings',account:'profile',keyboard
 const settingsPages={
   'general-settings':{title:'General'},appearance:{title:'Appearance'},'passkey-settings':{title:'Passkeys'},'access-settings':{title:'账号密码'},'domain-settings':{title:'访问域名'},'otp-settings':{title:'二次验证（OTP）'},'oidc-settings':{title:'统一身份登录（OIDC）'},agent:{title:'Configuration'},'global-instructions':{title:'Global instructions'},profile:{title:'Profile'},'keyboard-shortcuts':{title:'Keyboard shortcuts'},
   'plugins-settings':{title:'Plugins'},'skills-settings':{title:'Skills'},'browser-use':{title:'Browser'},
-  connections:{title:'MCP servers'},'code-review':{title:'Code review'},
+  connections:{title:'MCP servers'},'code-review':{title:'Code review'},about:{title:'About'},
 };
 function normalizeSettingsPage(page='general-settings'){const candidate=settingsPageAliases[page]||page;return settingsPages[candidate]?candidate:'general-settings'}
 function settingsRoutePage(pathname=location.pathname){const match=pathname.match(/^\/settings(?:\/([^/]+))?\/?$/);return match?normalizeSettingsPage(match[1]||'general-settings'):null}

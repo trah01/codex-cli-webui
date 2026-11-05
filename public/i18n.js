@@ -6,6 +6,7 @@ const ZH_CN = Object.create(null);
 Object.assign(ZH_CN, {
   "Remove": "移除",
   "Verify with a passkey": "使用通行密钥验证",
+  "About": "关于",
   "Passkeys": "通行密钥",
   "Sign in with a passkey": "使用通行密钥登录",
   "Passkeys can only be managed on the server. Remote access supports passkey sign-in only.": "只能在服务器本机管理通行密钥，远程访问仅支持通行密钥登录。",
