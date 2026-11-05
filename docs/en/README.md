@@ -10,6 +10,8 @@ A personal browser workspace for Codex: project conversations, code changes, app
 > The application can execute commands, read and modify files, open terminals, and use the Codex permissions and credentials available in its runtime environment. Authentication does not replace network isolation. Do not expose the service port through public port mappings, an ordinary reverse proxy, or a tunneling service. HTTPS does not replace access control and network isolation.
 >
 > For remote access, use a bastion security gateway as a reverse proxy and restrict the WebUI backend to connections from that gateway.
+>
+> **Disclaimer: The author does not recommend, encourage, or support using this project as a public Internet-facing service.** This project is provided "as is," without warranties of security or fitness for a particular purpose. Users assume the risks of deployment, access control, and use. If you expose this project to the Internet and your computer or server is compromised, credentials are leaked, data is lost, or other damage occurs as a result, the author and contributors accept no liability to the fullest extent permitted by applicable law.
 
 Inspired by [lezi-fun/codex-webui](https://github.com/lezi-fun/codex-webui), with extensive improvements built on that foundation.
 
