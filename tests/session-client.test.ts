@@ -130,3 +130,34 @@ test('question choices restore after refresh and show submitting, accepted and e
     expect(refreshed.window.document.querySelector('section')).toBeNull();
   } finally { drafts.close(); }
 });
+
+
+test('streaming shares unchanged history and keeps earlier snapshots stable', async () => {
+  const history = { id: 'history', items: [{ id: 'output', aggregatedOutput: 'x'.repeat(128000) }] };
+  const states = [], first = baseline(); first.snapshot.thread.turns.push(history);
+  const client = createSessionClient({ rpc: async () => first, onState: state => states.push(state) });
+  try {
+    await client.activate('a');
+    client.receive(event(2, 'initial'));
+    for (let seq = 3; seq < 103; seq++) client.receive({ threadId: 'a', epoch: 'epoch', seq,
+      patch: { delta: { turnId: 'turn', itemId: 'message', type: 'agentMessage', field: 'text', text: '.' } } });
+    expect(states.every(state => state.thread.turns[0] === history)).toBe(true);
+    expect(states[1].thread.turns[1].items[0].text).toBe('initial');
+    expect(states.at(-1).thread.turns[1].items[0].text).toBe('initial' + '.'.repeat(100));
+    client.receive({ threadId: 'a', epoch: 'epoch', seq: 103, patch: { queue: [{ id: 'queued' }] } });
+    expect(states.at(-1).thread).toBe(states.at(-2).thread);
+    client.close(); expect(client.current().snapshot).toBeNull();
+  } finally { client.close(); }
+});
+
+test('an overloaded subscription discards its backlog and obtains a fresh snapshot', async () => {
+  const pending = deferred(), states = []; let calls = 0;
+  const client = createSessionClient({ maxBufferedEvents: 2, rpc: async () => ++calls === 1 ? pending.promise : baseline('a', 4), onState: state => states.push(state) });
+  try {
+    const loading = client.activate('a');
+    for (let seq = 2; seq <= 4; seq++) client.receive(event(seq, 'backlog'));
+    pending.resolve(baseline()); await loading; await Promise.resolve();
+    expect(calls).toBe(2); expect(states).toHaveLength(1); expect(client.current().cursor.seq).toBe(4);
+    client.receive(event(5, 'current')); expect(states.at(-1).thread.turns[0].items[0].text).toBe('current');
+  } finally { client.close(); }
+});

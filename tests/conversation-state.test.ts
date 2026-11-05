@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
 import { PendingRequests } from '../pending-requests.js';
@@ -104,4 +104,39 @@ test('rollout messages without upstream ids remain distinct and ordered', () => 
   ].join('\n'));
   expect(state.turn.items.map(item => item.text)).toEqual(['first', 'second']);
   expect(new Set(state.turn.items.map(item => item.id)).size).toBe(2);
+});
+
+
+test('typing defers draft persistence, batches layout and skips autocomplete during IME composition', () => {
+  vi.useFakeTimers();
+  const saves = [], frames = [], lifecycle = {}, prompt = { value: 'first' };
+  const declarations = app.slice(app.indexOf('let composerDraftReady='), app.indexOf('function restoreComposerDraft('));
+  const inputHandler = app.match(/function handlePromptInput\(event\)\{[\s\S]*?\n\}/)[0];
+  let layouts = 0, autocomplete = 0;
+  const handlers = new Function('$', 'drafts', 'state', 'composerDraftOwner', 'addEventListener', 'requestAnimationFrame', 'resizePrompt', 'updateComposerAutocomplete',
+    declarations + inputHandler + ';return {input:handlePromptInput,save:saveComposerDraft};')(
+      () => prompt, { set: (...args) => saves.push(args) }, { composerMentions: [], composerImages: [] }, () => 'a',
+      (name, handler) => { lifecycle[name] = handler; }, callback => { frames.push(callback); return frames.length; },
+      () => { layouts++; }, () => { autocomplete++; });
+  try {
+    handlers.input({ isComposing: true }); prompt.value = '你好'; handlers.input({ isComposing: false });
+    expect(saves).toHaveLength(0); expect(frames).toHaveLength(1); expect(autocomplete).toBe(1);
+    frames[0](); expect(layouts).toBe(1);
+    vi.advanceTimersByTime(300); expect(saves).toHaveLength(1); expect(saves[0][2].text).toBe('你好');
+    prompt.value = 'next'; handlers.input({}); lifecycle.pagehide();
+    expect(saves.at(-1)[2].text).toBe('next');
+    vi.advanceTimersByTime(300); expect(saves).toHaveLength(2);
+  } finally { vi.useRealTimers(); }
+});
+
+test('typing without changing submit mode preserves the send button DOM', () => {
+  const dom = new JSDOM('<button id="sendButton"></button><textarea id="prompt"></textarea>');
+  const document = dom.window.document;
+  const sync = new Function('$', 'activeTurnId', 'state', 'interruptPending', 'imageReading', 'composerSubmitting', 'codexIcon', 't',
+    functionSource('syncComposerSubmitState', 'setActiveTurnId') + ';return syncComposerSubmitState;')(
+      selector => document.querySelector(selector), () => '', { composerImages: [] }, false, false, false,
+      () => '<svg></svg>', value => value);
+  sync(); const icon = document.querySelector('svg');
+  document.querySelector('textarea').value = 'typing'; sync();
+  expect(document.querySelector('svg')).toBe(icon);
 });
