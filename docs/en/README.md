@@ -30,7 +30,7 @@ The application connects to a real `codex app-server`. It prefers an existing lo
 
 ## Recommended access
 
-For local use, visit `http://127.0.0.1:8899`. For remote use, access the application through a bastion security gateway acting as a reverse proxy. The gateway must authenticate and authorize access; only the gateway should be able to connect to the WebUI backend.
+For local use, visit `http://localhost:8899`. For remote use, access the application through a bastion security gateway acting as a reverse proxy. The gateway must authenticate and authorize access; only the gateway should be able to connect to the WebUI backend.
 
 Keep the WebUI listening on `127.0.0.1` when the gateway runs on the same server. For separate hosts, use an isolated internal network and firewall rules limiting the source. The proxy must support WebSocket connections and streaming responses. See [configuration](#configuration) for related settings.
 
@@ -61,6 +61,39 @@ Open **http://localhost:8899**. The default listener is `127.0.0.1:8899`.
 
 Complete initial credential setup through the server's local browser, then select a project directory. Credential configuration requires direct access using `127.0.0.1` or `localhost`. IPv6 address literals, other IP addresses, domains, and forwarded requests cannot manage local credentials. Passkeys can only be managed locally after login through localhost. Remote HTTPS access supports sign-in with an existing credential for that domain; management is unavailable.
 
+## Install as an application
+
+Open the site in Chrome using `http://localhost:8899` or a controlled HTTPS domain. Once Chrome recognizes the application, use its address-bar install icon or browser menu to install it. The installed application opens in a standalone window and still requires a running WebUI server.
+
+## Cloud server configuration
+
+Use port forwarding to reach the server's local settings, or configure credentials, the access domain, OTP, and OIDC through environment variables.
+
+**Port forwarding:** run this command on your own computer, replacing the example user and server address:
+
+```bash
+ssh -N -L 8899:127.0.0.1:8899 username@server-address
+```
+
+Keep the connection open and visit `http://localhost:8899` in your local browser. The server treats this forwarded connection as local access, so you can manage credentials, the domain, and other options under Settings → Security. If local port 8899 is already in use, change the first `8899` in the command and use that port in the browser.
+
+**Environment variables:** copy [.env.example](../../.env.example) to `.env` and set a login password. For remote domain access, also set the allowed domain and HTTPS origin:
+
+```dotenv
+CODEX_WEBUI_USERNAME=your-user-name
+CODEX_WEBUI_PASSWORD=REPLACE_WITH_A_LONG_RANDOM_PASSWORD
+CODEX_WEBUI_DOMAIN=codex.example.com
+CODEX_WEBUI_PUBLIC_ORIGIN=https://codex.example.com
+```
+
+The username is optional and requires an environment-configured password. To load the file and start the service:
+
+```bash
+node --env-file=.env --import tsx server/index.ts
+```
+
+Alternatively, inject these variables through a service manager or container and run `npm start`. `npm start` does not load `.env` automatically. Restart the service after changing environment variables. Saved domain and authentication options take precedence over their environment defaults; environment-configured credentials take precedence over saved credentials. See [Configuration](#configuration) for all options.
+
 ## Settings and authentication
 
 Open settings from the sidebar to change appearance, language, models, reasoning, permissions, and global instructions. Switches and selections apply immediately; text saves automatically when editing finishes. Some Codex settings apply only to new conversations, as indicated in the interface.
@@ -71,13 +104,13 @@ Local security pages provide:
 - **Domain binding:** validates the hostname used by a controlled entry point. It does not configure DNS, certificates, or network restrictions, and does not authorize public exposure.
 - **Passkeys:** open Settings → Security → Passkeys after signing in. Manage credentials through `http://localhost:8899` on the server. Remote HTTPS access only supports sign-in with existing credentials for that domain; localhost credentials cannot be used on a remote hostname. Enrollment and removal require identity verification within the last five minutes. Device fingerprint, face, PIN, or a security key replaces password and OTP entry for Passkey login. Existing password and OIDC methods remain available. Public keys are stored in `.passkeys.json` next to the authentication store; private keys stay with the authenticator. Removing a key signs out other sessions.
 - **OTP:** authenticator-based codes for password login; enrollment requires a current code.
-- **OIDC:** bind the controlled entry domain, register the displayed callback with your identity provider, and enter client settings. Restrict provider access to trusted people: this application has no separate user allowlist. Enforce OIDC MFA at the identity provider.
+- **OIDC:** configure the controlled entry domain, register the callback with your identity provider, and enter client settings. This can be done through local settings or entirely through environment variables. Restrict provider access to trusted people: this application has no separate user allowlist. Enforce OIDC MFA at the identity provider.
 
 **All authorized users operate the same Codex instance and server environment. This application does not provide tenant isolation and must not be shared with untrusted users.**
 
 ## Configuration
 
-Defaults are sufficient for local use. See [.env.example](../../.env.example) for the complete environment variable reference.
+Defaults are sufficient for local use. Initial security configuration can also be supplied through environment variables without opening the server's local settings page. See [.env.example](../../.env.example) for the complete reference with Chinese comments.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -90,6 +123,16 @@ Defaults are sufficient for local use. See [.env.example](../../.env.example) fo
 | `CODEX_WEBUI_APP_SERVER_SOCKET` | Default Codex control socket | Override the shared backend socket |
 | `CODEX_AUTH_PATH` | `$CODEX_HOME/auth.json` | Override the Codex authentication file |
 | `CODEX_WEBUI_AUTH_STORE` | `$CODEX_HOME/codex-webui-auth.json` | Base path for WebUI credentials and related storage |
+| `CODEX_WEBUI_USERNAME` | Unset | Optional login username; requires the environment password |
+| `CODEX_WEBUI_DOMAIN` | Unset | Initial allowed domain without a protocol, port, or path; saved domain settings take precedence |
+| `CODEX_WEBUI_PUBLIC_ORIGIN` | Unset | Remote HTTPS origin matching the allowed domain |
+| `CODEX_WEBUI_AUTH_MODE` | Password login | `password`, `oidc`, or `both` |
+| `CODEX_WEBUI_LOCAL_AUTH_REQUIRED` | `true` | Require login for localhost and 127.0.0.1 access |
+| `CODEX_WEBUI_OTP_SECRET` | Unset | Password-login authenticator secret; random Base32 with at least 32 characters |
+| `CODEX_WEBUI_OIDC_ISSUER` | Unset | HTTPS issuer URL for single sign-on |
+| `CODEX_WEBUI_OIDC_CLIENT_ID` | Unset | Client ID assigned by the identity provider |
+| `CODEX_WEBUI_OIDC_CLIENT_SECRET` | Unset | Client secret assigned by the identity provider |
+| `CODEX_WEBUI_OIDC_REDIRECT_URI` | Unset | Callback at `/api/auth/oidc/callback` on the allowed domain |
 | `CODEX_WEBUI_PASSWORD` | Unset | Startup login password; takes precedence over the managed password |
 | `CODEX_WEBUI_ACCESS_TOKEN` | Unset | Explicit Bearer credential in password mode; disabled with OTP or OIDC |
 | `CODEX_WEBUI_NTFY_TOPIC` | Unset | Optional completion notification topic |
@@ -132,8 +175,18 @@ The frontend entry is `public/app.js`; startup generates the browser bundle. Ref
 
 For a standalone build, run `npm run build`, then `node dist/server.js`. Browser, integration, and end-to-end test commands are listed in [package.json](../../package.json). Some require Chromium or an authenticated Codex installation.
 
+## Documentation
+
+| Document | Contents |
+| --- | --- |
+| [Deployment and access](../guides/部署与访问.md) | Security gateways, network isolation, and Docker |
+| [Configuration guide](../guides/配置说明.md) | Interface settings, authentication, environment variables, and data |
+| [Development guide](../development/开发指南.md) | Development, checks, tests, and builds |
+
+The linked guides are in Chinese.
+
 ## Notices and license
 
 This is an unofficial tool, not affiliated with, endorsed by, or maintained by OpenAI. Codex interfaces may change between versions; verify key workflows after upgrading the CLI.
 
-See [LICENSE](../../LICENSE) for source licensing, [Third-party notices](../legal/第三方声明.md) for third-party dependencies and visual assets, and [SECURITY.md](../../.github/SECURITY.md) for security reporting.
+See [LICENSE](../../LICENSE) for source licensing, [Third-party notices](../legal/第三方声明.md) for third-party dependencies and visual assets, and [Security policy](../../.github/SECURITY.md) for security reporting. The notices and policy are in Chinese, with original license text retained where required.
