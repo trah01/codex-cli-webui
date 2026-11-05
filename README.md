@@ -90,10 +90,20 @@ For unattended deployments, provide the password at startup instead:
 HOST=0.0.0.0 CODEX_WEBUI_PASSWORD='use-a-long-random-password' npm run start
 ```
 
-Save a bound domain in the same settings page to enable remote access. Only direct `127.0.0.1` access is allowed until a domain is bound; other IP addresses, `localhost`, IPv6, and unbound domains are rejected. Domain settings are stored next to the credential file as `codex-webui-auth.json.access.json`. Reverse proxies must preserve the external `Host` or supply an accurate `X-Forwarded-Host`, including the external port when applicable. Only the configured domain is accepted from this forwarded header. Domain binding does not configure DNS or TLS. Remote requests must sign in before the main application bundle, HTTP APIs, or WebSocket bridges are available. Successful authentication uses a signed `HttpOnly`, `SameSite=Strict` session cookie.
+Save a bound domain in the same settings page to enable remote access. Only direct `127.0.0.1` access is allowed until a domain is bound; other IP addresses, `localhost`, IPv6, and unbound domains are rejected. Domain settings are stored next to the credential file as `codex-webui-auth.json.access.json`. Reverse proxies must preserve the external `Host` or supply an accurate `X-Forwarded-Host`, including the external port when applicable. Only the configured domain is accepted from this forwarded header. Domain binding does not configure DNS or TLS. Remote requests must sign in before the main application bundle, HTTP APIs, or WebSocket bridges are available. Successful authentication uses an opaque server-side session with an `HttpOnly`, `SameSite=Strict` cookie. Sessions expire after eight hours and are invalidated on restart.
 
-`CODEX_WEBUI_ACCESS_TOKEN` remains available for compatibility with Basic/Bearer clients. `CODEX_WEBUI_PASSWORD` takes precedence over both the managed password and access token for browser login. Set `CODEX_WEBUI_AUTH_STORE` to move the managed credential file.
+`CODEX_WEBUI_ACCESS_TOKEN` is an explicit Bearer-only machine credential in password mode; OTP and OIDC disable it. Basic authentication and direct API authentication with a password are not supported. `CODEX_WEBUI_PASSWORD` takes precedence over both the managed password and access token for browser login. Set `CODEX_WEBUI_AUTH_STORE` to move the managed credential file.
 
+
+### OTP and OIDC
+
+All APIs, WebSocket bridges, terminal connections and event streams require authentication, including direct loopback access. Initial setup is available only through direct `http://127.0.0.1`; later credential/domain changes also require an authenticated session. Sign out revokes the current session and its connections. Password rotation revokes all sessions.
+
+Set `CODEX_WEBUI_OTP_SECRET` to an independently generated Base32 secret of at least 32 characters and enroll that same secret in an authenticator (SHA1, six digits, 30 seconds). Generate locally with `node --input-type=module -e "import {Secret} from 'otpauth'; console.log(new Secret({size:20}).base32)"`. Configure a password before enabling OTP, then restart. Codes allow one step of clock drift and cannot be reused. Recovery requires a server administrator to replace the secret and restart.
+
+For OIDC, bind the public domain locally first, then configure `CODEX_WEBUI_OIDC_ISSUER`, `CODEX_WEBUI_OIDC_CLIENT_ID`, `CODEX_WEBUI_OIDC_CLIENT_SECRET`, `CODEX_WEBUI_OIDC_REDIRECT_URI` (exact HTTPS URL ending in `/api/auth/oidc/callback`), and `CODEX_WEBUI_OIDC_ALLOWED_SUBJECTS` (comma-separated exact `sub` values). The provider must support `client_secret_post`. OIDC uses the authorization code flow with PKCE, state, nonce, signed ID Token validation and an explicit subject allowlist. Configuring an issuer defaults to OIDC-only authentication; explicitly set `CODEX_WEBUI_AUTH_MODE=both` to also permit password login. OTP applies to password login; enforce OIDC MFA at your identity provider. Configure a password before selecting `both`. OIDC-only mode also disables local password login; later local settings maintenance requires an administrator to temporarily switch to password mode and sign in.
+
+Use an HTTPS reverse proxy and restrict the backend port to that proxy. In password mode, set `CODEX_WEBUI_PUBLIC_ORIGIN=https://codex.example.com` without a trailing slash to enforce the origin and enable Secure cookies. OIDC derives this from the callback URL. Login attempts are limited per TCP peer and globally over five minutes; users behind a proxy share the peer quota. See [.env.example](./.env.example) and the [Chinese configuration guide](./README-zh.md#otp-与统一身份登录). All allowed users control the same Codex instance; this is not tenant isolation.
 
 Messages wait in a per-thread queue while another Codex app or CLI owns the thread, then send automatically in order. The composer shows pending messages with cancel and retry actions. The queue is stored next to the credential file as `codex-webui-auth.json.queue.json` and survives refreshes and restarts. Messages whose delivery was uncertain during a crash require checking the conversation before retrying.
 
@@ -124,7 +134,7 @@ npm run start
 | `PORT` | `8899` | HTTP/WebSocket port |
 | `CODEX_WEBUI_PASSWORD` | unset | Optional browser login password for LAN access; bypasses first-run setup |
 | `CODEX_WEBUI_AUTH_STORE` | `$CODEX_HOME/codex-webui-auth.json` | Salted managed password credential created by first-run setup |
-| `CODEX_WEBUI_ACCESS_TOKEN` | unset | Compatibility secret for Basic/Bearer clients and browser login when no password is configured; username `codex` |
+| `CODEX_WEBUI_ACCESS_TOKEN` | unset | Explicit Bearer machine secret in password mode without OTP; also a browser password fallback |
 | `CODEX_WEBUI_CWD` | repository directory | Initial Codex working directory |
 | `CODEX_WEBUI_REVIEW_ROOT` | `CODEX_WEBUI_CWD` | Exact Git root allowed for Undo/Reapply |
 | `CODEX_HOME` | `~/.codex` | Codex state directory containing `auth.json` |
@@ -263,7 +273,7 @@ The repository currently includes Codex-style brand and motion assets extracted 
 - The Codex app-server protocol is evolving and may change between CLI versions.
 - Browser tests need a compatible Chromium browser.
 - Undo/Reapply currently operates on the complete aggregated diff, not one hunk at a time.
-- Authentication and public-Internet deployment are intentionally out of scope.
+- Public access requires HTTPS, authentication and a restricted backend network; multi-tenant permission isolation is not provided.
 
 ## Contributing
 

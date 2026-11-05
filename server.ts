@@ -1,3 +1,4 @@
+import { authenticationConfig, createAuthentication, authorizeAuthenticationRequest } from './authentication.js';
 import { mergeTurnSources } from './session-items.js';
 import { createSessionRequestHandlers } from './session-request-service.js';
 import { SessionService } from './session-service.js';
@@ -22,14 +23,11 @@ import { resolveLocalImage } from "./image-service.js";
 import { LiveSessionStore } from "./live-session-service.js";
 import { createSettingsService } from "./settings-service.js";
 import {
-  createPasswordSession,
   createStoredPassword,
   isAllowedBrowserRpcMethod,
-  isAuthorizedHttpRequest,
   isLocalAuthManagementRequest,
   isRequestAuthorized,
   isSameOrigin,
-  passwordSessionCookie,
   resolvePublicAsset,
   resolveSafeRegularFile,
   storedPasswordSessionSecret,
@@ -62,6 +60,13 @@ const domainStorePath = `${managedPasswordPath}.access.json`;
 let boundDomain = loadBoundDomain(domainStorePath);
 let managedPassword: StoredPassword | null = environmentPassword || accessToken ? null : loadStoredPassword(managedPasswordPath);
 let authSecret = environmentPassword || accessToken || storedPasswordSessionSecret(managedPassword);
+const authenticationOptions = authenticationConfig();
+const authentication = createAuthentication(authenticationOptions);
+if (authenticationOptions.totp && !authSecret && authenticationOptions.mode !== 'oidc') throw new Error('Configure a password before enabling OTP');
+if (authenticationOptions.mode === 'both' && !authSecret) throw new Error('Configure a password before enabling both authentication methods');
+if (authenticationOptions.mode !== 'password' && new URL(authenticationOptions.provider.redirectUri).hostname !== boundDomain) throw new Error('Bind the OIDC callback domain locally before enabling OIDC');
+const publicOrigin = authenticationOptions.provider && authenticationOptions.mode !== 'password' ? new URL(authenticationOptions.provider.redirectUri).origin : process.env.CODEX_WEBUI_PUBLIC_ORIGIN || null;
+if (publicOrigin && (new URL(publicOrigin).protocol !== 'https:' || new URL(publicOrigin).origin !== publicOrigin)) throw new Error('CODEX_WEBUI_PUBLIC_ORIGIN must be an HTTPS origin without a trailing slash');
 let passwordSetupInProgress = false;
 const localhostOnly = host === "127.0.0.1" || host === "::1" || host === "localhost";
 const moduleDir = fileURLToPath(new URL(".", import.meta.url));
@@ -377,7 +382,7 @@ function readJsonBody(req: IncomingMessage, maxBytes = 256_000) {
 }
 
 function passwordSetupRequired() {
-  return !authSecret;
+  return !authSecret && authenticationOptions.mode !== 'oidc';
 }
 
 function browserPasswordConfigured() {
@@ -412,9 +417,21 @@ function validBrowserPassword(req: IncomingMessage, submittedPassword: string, u
   return requestMatchesSecret(req, submittedPassword, accessToken);
 }
 
-function authorizedRequest(req: IncomingMessage) {
+function authConfigured() { return Boolean(authSecret || (authenticationOptions.provider && authenticationOptions.mode !== 'password')); }
+function secureCookie(req: IncomingMessage) { return Boolean((req.socket as any).encrypted || (publicOrigin && !isLocalAuthManagementRequest(req))); }
+function sameOriginRequest(req: IncomingMessage) {
   const accessRequest = boundDomainRequest(req, boundDomain);
-  return Boolean(accessRequest && isAuthorizedHttpRequest(accessRequest, authSecret, isLocalAuthManagementRequest(req), managedPassword));
+  if (!accessRequest || req.headers['sec-fetch-site'] === 'cross-site') return false;
+  if (req.headers.origin && publicOrigin && req.headers.origin !== publicOrigin && !isLocalAuthManagementRequest(req)) return false;
+  return isSameOrigin(req.headers.origin, accessRequest.headers.host);
+}
+function authorizedRequest(req: IncomingMessage) {
+  if (!sameOriginRequest(req)) return false;
+  if (!authConfigured()) return false;
+  return authorizeAuthenticationRequest(boundDomainRequest(req, boundDomain), authentication, authenticationOptions, accessToken);
+}
+function canManageAuthentication(req: IncomingMessage) {
+  return isLocalAuthManagementRequest(req) && (!authConfigured() || authorizedRequest(req));
 }
 
 function sendAuthError(res: ServerResponse, status: number, error: string, extraHeaders: Record<string, string> = {}) {
@@ -428,12 +445,13 @@ function sendAuthError(res: ServerResponse, status: number, error: string, extra
 }
 
 function issueBrowserSession(req: IncomingMessage, res: ServerResponse) {
-  if (!authSecret) throw new Error("Authentication is not configured");
-  const session = createPasswordSession(authSecret);
+  let cookie: string;
+  try { cookie = authentication.issue(secureCookie(req)); }
+  catch { sendAuthError(res, 503, '登录会话已满，请稍后重试。'); return; }
   res.writeHead(200, {
     "content-type": "application/json; charset=utf-8",
     "cache-control": "no-store",
-    "set-cookie": passwordSessionCookie(session.token, { secure: Boolean((req.socket as any).encrypted) }),
+    "set-cookie": cookie,
     "x-content-type-options": "nosniff",
   });
   res.end(JSON.stringify({ ok: true }));
@@ -449,6 +467,11 @@ const mime: Record<string, string> = {
 };
 
 const server = createServer(async (req, res) => {
+  res.setHeader('x-content-type-options', 'nosniff');
+  res.setHeader('x-frame-options', 'DENY');
+  res.setHeader('referrer-policy', 'no-referrer');
+  res.setHeader('content-security-policy', "frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'");
+  res.setHeader('cache-control', 'no-store');
   if (!boundDomainRequest(req, boundDomain)) {
     sendAuthError(res, 403, "Access is only allowed through 127.0.0.1 or the bound domain");
     return;
@@ -467,15 +490,18 @@ const server = createServer(async (req, res) => {
     res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" });
     res.end(JSON.stringify({
       setupRequired: passwordSetupRequired() && !authenticated,
-      passwordRequired: browserPasswordConfigured(),
+      passwordRequired: authenticationOptions.mode !== 'oidc' && browserPasswordConfigured(),
+      otpRequired: Boolean(authenticationOptions.totp) && authenticationOptions.mode !== 'oidc',
+      oidcEnabled: Boolean(authenticationOptions.provider) && authenticationOptions.mode !== 'password',
+      passwordEnabled: authenticationOptions.mode !== 'oidc',
       authenticated,
-      canManageCredentials: isLocalAuthManagementRequest(req),
+      canManageCredentials: canManageAuthentication(req),
       usernameRequired: Boolean(managedPassword?.username),
     }));
     return;
   }
   if (url.pathname === "/api/auth/domain") {
-    if (!isLocalAuthManagementRequest(req)) {
+    if (!canManageAuthentication(req)) {
       sendAuthError(res, 403, "Account settings are only available through http://127.0.0.1");
       return;
     }
@@ -499,7 +525,7 @@ const server = createServer(async (req, res) => {
     return;
   }
   if (url.pathname === "/api/auth/setup" || url.pathname === "/api/auth/credentials") {
-    if (!isLocalAuthManagementRequest(req)) {
+    if (!canManageAuthentication(req)) {
       sendAuthError(res, 403, "Account settings are only available through http://127.0.0.1");
       return;
     }
@@ -540,6 +566,7 @@ const server = createServer(async (req, res) => {
       else saveStoredPassword(managedPasswordPath, credential);
       managedPassword = credential;
       authSecret = storedPasswordSessionSecret(credential);
+      authentication.revokeAll();
       issueBrowserSession(req, res);
       // Existing remote connections must authenticate again after credential rotation.
       for (const client of clients) client.close(1008, "Account settings changed");
@@ -551,25 +578,50 @@ const server = createServer(async (req, res) => {
     } finally { passwordSetupInProgress = false; }
     return;
   }
+  if (url.pathname === '/api/auth/oidc/start' || url.pathname === '/api/auth/oidc/callback') {
+    if (req.method !== 'GET' || !authenticationOptions.provider || authenticationOptions.mode === 'password') {
+      sendAuthError(res, 404, 'Not found'); return;
+    }
+    if (!authentication.allowAttempt(req.socket.remoteAddress)) { sendAuthError(res, 429, 'Too many login attempts. Try again in five minutes.', { 'retry-after': '300' }); return; }
+    try {
+      if (url.pathname.endsWith('/start')) {
+        if (!sameOriginRequest(req)) { sendAuthError(res, 403, 'Invalid request origin'); return; }
+        const flow = await authentication.startOidc();
+        res.writeHead(302, { location: flow.url, 'set-cookie': flow.cookie }); res.end();
+      } else {
+        const expected = new URL(authenticationOptions.provider.redirectUri);
+        const accessRequest = boundDomainRequest(req, boundDomain);
+        if (accessRequest.headers.host !== expected.host) throw new Error('Callback host mismatch');
+        expected.search = url.search;
+        await authentication.finishOidc(expected, req);
+        res.writeHead(303, { location: '/', 'set-cookie': [authentication.issue(true), 'codex_webui_oidc=; Path=/api/auth/oidc; HttpOnly; Secure; SameSite=Lax; Max-Age=0'] }); res.end();
+      }
+    } catch { sendAuthError(res, 401, '身份认证失败，请重新登录或联系管理员检查配置。'); }
+    return;
+  }
+  if (url.pathname === '/api/auth/logout') {
+    if (req.method !== 'POST') { sendAuthError(res, 405, 'Method not allowed', { allow: 'POST' }); return; }
+    if (!sameOriginRequest(req)) { sendAuthError(res, 403, 'Invalid request origin'); return; }
+    res.writeHead(200, { 'content-type': 'application/json', 'set-cookie': authentication.logout(req, secureCookie(req)) });
+    res.end(JSON.stringify({ ok: true })); return;
+  }
   if (url.pathname === "/api/auth/login") {
     if (req.method !== "POST") {
       sendAuthError(res, 405, "Method not allowed", { allow: "POST" });
       return;
     }
+    if (authenticationOptions.mode === 'oidc') { sendAuthError(res, 403, '请使用统一身份登录。'); return; }
+    if (!sameOriginRequest(req)) { sendAuthError(res, 403, 'Invalid request origin'); return; }
+    if (!authentication.allowAttempt(req.socket.remoteAddress)) { sendAuthError(res, 429, '登录尝试过多，请五分钟后重试。', { 'retry-after': '300' }); return; }
     let payload: any;
     try { payload = await readJsonBody(req, 4096); }
     catch {
-      sendAuthError(res, 401, "Incorrect username or password");
+      sendAuthError(res, 401, "账号、密码或验证码不正确。");
       return;
     }
     const submittedPassword = typeof payload?.password === "string" ? payload.password : "";
-    const loginRequest = boundDomainRequest(req, boundDomain);
-    if (req.headers["sec-fetch-site"] === "cross-site" || !isSameOrigin(req.headers.origin, loginRequest.headers.host)) {
-      sendAuthError(res, 403, "Request origin does not match the access domain");
-      return;
-    }
-    if (!validBrowserPassword(req, submittedPassword, typeof payload?.username === "string" ? payload.username : undefined)) {
-      sendAuthError(res, 401, "Incorrect username or password");
+    if (submittedPassword.length > 256 || !validBrowserPassword(req, submittedPassword, typeof payload?.username === "string" ? payload.username : undefined) || !authentication.verifyOtp(payload?.otp)) {
+      sendAuthError(res, 401, "账号、密码或验证码不正确。");
       return;
     }
     issueBrowserSession(req, res);
@@ -603,6 +655,12 @@ const server = createServer(async (req, res) => {
     res.flushHeaders?.();
     res.write("retry: 1000\n\n");
     sseClients.add(res);
+    const session = authentication.sessionFor(req);
+    if (session) {
+      const expiry = setInterval(() => { if (session.revoked || session.expiresAt <= Date.now()) res.end(); }, 1000);
+      expiry.unref();
+      res.once('close', () => clearInterval(expiry));
+    }
     const clientId = url.searchParams.get("clientId") || "";
     const channel = { send: (message: any) => { if (!res.writableEnded) res.write(`data: ${JSON.stringify(message)}\n\n`); } };
     if (/^[a-zA-Z0-9_-]{16,128}$/.test(clientId)) {
@@ -880,7 +938,9 @@ const sseKeepalive = setInterval(() => {
 sseKeepalive.unref();
 
 const wss = new WebSocketServer({ noServer: true, maxPayload: TURN_REQUEST_MAX_BYTES });
-const terminalWss = new WebSocketServer({ noServer: true });
+const terminalWss = new WebSocketServer({ noServer: true, maxPayload: 1_000_000 });
+server.headersTimeout = 15_000;
+server.requestTimeout = 30_000;
 server.on("upgrade", (req, socket, head) => {
   let pathname = "";
   try { pathname = new URL(req.url || "/", "http://localhost").pathname; }
@@ -890,7 +950,7 @@ server.on("upgrade", (req, socket, head) => {
     socket.end([
       "HTTP/1.1 401 Unauthorized",
       "Connection: close",
-      'WWW-Authenticate: Basic realm="codex-cli-webui", charset="UTF-8"',
+      'WWW-Authenticate: Bearer realm="codex-cli-webui"',
       "Content-Type: application/json; charset=utf-8",
       `Content-Length: ${Buffer.byteLength(body)}`,
       "X-Content-Type-Options: nosniff",
@@ -899,14 +959,27 @@ server.on("upgrade", (req, socket, head) => {
     ].join("\r\n"));
     return;
   }
+  const session = authentication.sessionFor(req);
   const target = pathname === "/terminal" ? terminalWss : wss;
-  target.handleUpgrade(req, socket, head, client => target.emit("connection", client, req));
+  target.handleUpgrade(req, socket, head, client => {
+    if (session) {
+      const valid = () => !session.revoked && session.expiresAt > Date.now();
+      const timer = setInterval(() => { if (!valid()) client.close(1008, 'Session expired'); }, 1000);
+      timer.unref();
+      client.prependListener('message', () => { if (!valid()) client.close(1008, 'Session expired'); });
+      (client as any).authenticatedSession = session;
+      client.once('close', () => clearInterval(timer));
+    }
+    target.emit("connection", client, req);
+  });
 });
 wss.on("connection", (client) => {
   clients.add(client);
   const channel = { send: (message: any) => { if (client.readyState === WebSocket.OPEN) client.send(JSON.stringify(message)); } };
   client.send(JSON.stringify({ type: "bridge/status", status: connected ? "connected" : "connecting" }));
   client.on("message", (raw) => {
+    const session = (client as any).authenticatedSession;
+    if (session && (session.revoked || session.expiresAt <= Date.now())) return;
     try { handleClient(client, JSON.parse(String(raw)), channel); }
     catch (error) { client.send(JSON.stringify({ type: "rpc/error", error: String(error) })); }
   });
@@ -936,6 +1009,8 @@ terminalWss.on("connection", (client, req) => {
     return;
   }
   client.on("message", (raw, isBinary) => {
+    const session = (client as any).authenticatedSession;
+    if (session && (session.revoked || session.expiresAt <= Date.now())) return;
     if (!terminal || raw.byteLength > 1_000_000) return;
     if (isBinary) {
       terminal.write(Buffer.from(raw as Buffer).toString("utf8"));

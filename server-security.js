@@ -214,7 +214,7 @@ export function unauthorizedResponse(res) {
   res.writeHead(401, {
     "content-type": "application/json; charset=utf-8",
     "cache-control": "no-store",
-    "www-authenticate": 'Basic realm="codex-cli-webui", charset="UTF-8"',
+    "www-authenticate": 'Bearer realm="codex-cli-webui"',
     "x-content-type-options": "nosniff",
   });
   res.end(JSON.stringify({ error: "Authentication required" }));

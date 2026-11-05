@@ -13,8 +13,10 @@ Do not publish exploitable details in a public issue. Use GitHub's private vulne
 codex-cli-webui runs commands and edits files through the local Codex app-server. Treat it as a local developer tool, not as a hardened multi-tenant service.
 
 - Do not expose port `8899` directly to the public Internet.
-- The default listener is `127.0.0.1`. A non-localhost listener requires first-run LAN password setup, `CODEX_WEBUI_PASSWORD`, or `CODEX_WEBUI_ACCESS_TOKEN` before protected HTTP and WebSocket requests are accepted. First-run setup must be completed only on a trusted LAN because the first reachable client can claim it.
-- Managed LAN passwords are stored only as a salted `scrypt` credential. Browser sessions use signed `HttpOnly`, `SameSite=Strict` cookies; `CODEX_WEBUI_ACCESS_TOKEN` remains the Basic/Bearer compatibility path for non-browser clients.
+- The default listener is `127.0.0.1`. All execution APIs, terminal connections, event streams and WebSocket bridges require login, including loopback. Initial credential setup is restricted to direct IPv4 loopback; subsequent credential/domain changes also require an authenticated session.
+- Managed passwords use salted `scrypt`. Optional TOTP protects password login. OIDC uses PKCE, state, nonce and signed ID Token validation with an explicit subject allowlist; configure MFA at the identity provider.
+- Sessions are random, stored server-side, expire after eight hours, and are revoked on logout, credential rotation or restart. Cookies are HttpOnly and SameSite=Strict; an HTTPS public origin or OIDC enables Secure cookies. Configure TLS and restrict the backend network.
+- Explicit Bearer machine credentials are available only in password mode without OTP. Basic authentication and passwords cannot directly authorize API requests. Login attempts are rate limited by TCP peer and globally.
 - Browser WebSocket RPC is allowlisted and cannot invoke app-server filesystem, configuration, or account methods.
 - Static files are allowlisted, canonicalized, and symbolic links are never served.
 - Folder browsing canonicalizes paths and rejects symbolic links that escape the user's home directory.

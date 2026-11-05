@@ -42,8 +42,6 @@ codex-cli-webui 优先连接本机已有的 Codex 共享后台，未发现共享
 - 桌面与移动端响应式布局，手机端使用全屏 Summary 与 Task Side Panel 抽屉
 - 默认只监听 localhost；局域网访问需显式启用认证
 
-
-
 会话状态由 WebUI 后端统一管理，浏览器仅订阅当前会话。事件带有连续序号，断线后补发保留范围内的事件；超出范围时返回完整快照。事件日志、会话快照和草稿保存在认证文件旁的 `codex-webui-auth.json.sessions/`，问答及审批记录保存在 `codex-webui-auth.json.requests.json`；这些文件包含会话内容，应与原有 Codex 会话数据一并保护。修改认证文件路径时，相关存储位置随之变化。
 
 输入框中的文字、附件和非密码问题的答案草稿会自动保存。审批和问答区分提交中、已接收、已结束及等待恢复连接。若服务重启后 Codex 没有重新提供原请求，记录保留为等待恢复，不能继续发送旧授权；原轮次结束后记录会标记为已结束。
@@ -96,8 +94,37 @@ HOST=0.0.0.0 npm run start
 HOST=0.0.0.0 CODEX_WEBUI_PASSWORD='use-a-long-random-password' npm run start
 ```
 
-在同一设置页填写绑定域名（例如 `codex.example.com`）并保存。未绑定时仅允许直接通过 `127.0.0.1` 访问；绑定后只允许 `127.0.0.1` 和该域名，其他域名、局域网 IP、`localhost` 和 IPv6 地址均被拒绝。域名配置保存在凭据文件旁的 `codex-webui-auth.json.access.json`，修改域名无需重新设置密码。反向代理应保留外部 `Host`，或传递准确的 `X-Forwarded-Host`（域名及外部端口）；后端只接受与绑定域名匹配的转发地址。域名绑定不替代反向代理和 TLS 配置。远程客户端在登录前，无法访问应用 Bundle、HTTP API 和 WebSocket bridge。认证成功后使用签名的 `HttpOnly`、`SameSite=Strict` 会话 Cookie。
+在同一设置页填写绑定域名（例如 `codex.example.com`）并保存。未绑定时仅允许直接通过 `127.0.0.1` 访问；绑定后只允许 `127.0.0.1` 和该域名，其他域名、局域网 IP、`localhost` 和 IPv6 地址均被拒绝。域名配置保存在凭据文件旁的 `codex-webui-auth.json.access.json`，修改域名无需重新设置密码。反向代理应保留外部 `Host`，或传递准确的 `X-Forwarded-Host`（域名及外部端口）；后端只接受与绑定域名匹配的转发地址。域名绑定不替代反向代理和 TLS 配置。远程客户端在登录前，无法访问应用 Bundle、HTTP API 和 WebSocket bridge。认证成功后使用服务端保存的随机会话和 `HttpOnly`、`SameSite=Strict` Cookie。会话有效期为 8 小时，服务重启后需要重新登录。
 
+
+### OTP 与统一身份登录
+
+所有执行接口、本地终端、WebSocket 和事件流都需要登录；`127.0.0.1` 也不免登录。首次配置仅能在服务器直接打开 `http://127.0.0.1:8899` 完成。配置完成后，修改账号和域名还需要已登录会话。右上角“退出登录”会撤销当前会话，修改密码会撤销全部会话。
+
+OTP 使用验证器常见的 TOTP 标准：SHA1、6 位、每 30 秒更新。在服务器本地生成独立密钥，并将同一密钥手动添加到可信验证器：
+
+```bash
+node --input-type=module -e "import {Secret} from 'otpauth'; console.log(new Secret({size:20}).base32)"
+```
+
+设置 `CODEX_WEBUI_OTP_SECRET` 为生成的 Base32 密钥，保留已配置的密码，重启后登录需要密码和动态验证码。允许前后 30 秒的时钟误差，同一验证码不能重复登录。密钥只通过服务器配置维护，不通过网页显示；遗失验证器时由服务器管理员更换密钥并重启。服务器应保持系统时间同步。
+
+OIDC 通过 `openid-client` 实现授权码登录，使用 PKCE、state、nonce 和签名 ID Token 校验。先在本机绑定访问域名，再向身份提供方注册以下配置；示例值均需替换：
+
+```dotenv
+CODEX_WEBUI_AUTH_MODE=oidc
+CODEX_WEBUI_OIDC_ISSUER=https://identity.example.com/realms/example
+CODEX_WEBUI_OIDC_CLIENT_ID=codex-webui
+CODEX_WEBUI_OIDC_CLIENT_SECRET=REPLACE_WITH_CLIENT_SECRET
+CODEX_WEBUI_OIDC_REDIRECT_URI=https://codex.example.com/api/auth/oidc/callback
+CODEX_WEBUI_OIDC_ALLOWED_SUBJECTS=REPLACE_WITH_ADMIN_SUBJECT
+```
+
+回调地址必须与身份提供方登记的地址一致，客户端需支持 `client_secret_post`。允许名单填写该 issuer 下账号的精确 `sub` 值，多个值用英文逗号分隔；名单外账号不能登录，不开放自动注册。设置 issuer 后默认只允许 OIDC 登录；`CODEX_WEBUI_AUTH_MODE=both` 可显式允许密码和 OIDC 两种入口。OTP 保护密码登录，OIDC 的多因素验证应在身份提供方强制开启。`both` 模式需先配置密码；仅 OIDC 模式不开放本机密码登录，后续本机设置维护需由服务器管理员临时切回密码模式并登录。
+
+公网入口使用 HTTPS 反向代理。密码模式设置 `CODEX_WEBUI_PUBLIC_ORIGIN=https://codex.example.com`（不带结尾斜线），以固定来源校验并启用 `Secure` Cookie；OIDC 自动使用回调地址的 HTTPS 来源。代理保留外部域名，后端端口只向代理开放。登录按 TCP 来源和全局总量限制尝试次数；代理后的用户共享来源额度，超过后等待五分钟。
+
+`CODEX_WEBUI_ACCESS_TOKEN` 仅保留密码模式下显式配置的 Bearer 机器入口，开启 OTP 或 OIDC 后停用；Basic 和直接以密码调用 API 均不支持。所有登录用户拥有同一 Codex 实例的操作权限，允许名单应只包含受信任的管理员。
 
 会话被其他 Codex 应用或 CLI 占用时，发送的消息会排队等待，空闲后按顺序自动发送。输入框附近可查看、取消排队消息，发送失败后可重试。队列保存在凭据文件旁的 `codex-webui-auth.json.queue.json`，刷新页面或正常重启后仍会保留；若异常退出时无法确认发送结果，会提示先检查对话再重试。
 
@@ -255,7 +282,7 @@ npm run test:e2e
 - Codex app-server 协议仍在演进，不同 CLI 版本之间可能出现变化。
 - 浏览器测试需要兼容的 Chromium 浏览器。
 - Undo/Reapply 当前作用于完整聚合 Diff，尚不支持逐 Hunk 操作。
-- 项目有意不提供公网部署认证系统。
+- 公网访问需配置 HTTPS、准入认证和受限的后端网络；本项目不提供多租户权限隔离。
 
 ## 参与贡献
 

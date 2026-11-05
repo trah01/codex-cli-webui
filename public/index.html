@@ -21,8 +21,11 @@
     <input id="passwordInput" type="password" placeholder="Password" autocomplete="current-password" required>
     <label class="sr-only" for="passwordConfirmInput">Confirm password</label>
     <input id="passwordConfirmInput" type="password" placeholder="Confirm password" autocomplete="new-password" required hidden>
+    <label class="sr-only" for="otpInput">Verification code</label>
+    <input id="otpInput" type="text" placeholder="Verification code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" hidden>
     <div class="password-error" id="passwordError" role="alert" hidden></div>
     <button id="passwordLoginButton" type="submit">Log in</button>
+    <button id="oidcLoginButton" type="button" hidden>Single sign-on</button>
   </form>
 </section>
 <div id="app" class="app-shell">
@@ -32,6 +35,7 @@
     <button class="icon-button mobile-only" id="mobileNewTask" type="button" title="New chat" aria-label="New chat"><span class="icon-slot" data-icon="plus"></span></button>
     <button class="icon-button mobile-only" id="mobileToolsButton" type="button" title="More" aria-label="More" aria-expanded="false" aria-controls="topActions"><span class="icon-slot" data-icon="ellipsis"></span></button>
     <div class="top-actions" id="topActions">
+      <button id="webuiLogoutButton" type="button" hidden>Sign out</button>
       <button class="icon-button" id="toggleSidebar" title="Toggle sidebar" aria-controls="sidebar" aria-expanded="true" aria-pressed="true"><span class="icon-slot" data-icon="panelLeft"></span></button>
       <button class="icon-button" id="toggleBottomPanel" title="Toggle terminal panel" aria-controls="bottomPanel" aria-expanded="false" aria-pressed="false"><span class="icon-slot" data-icon="panelBottom"></span><span class="mobile-only">Terminal</span></button>
       <button class="icon-button" id="toggleSummaryPanel" title="Toggle summary" aria-controls="summaryPanel" aria-expanded="false" aria-pressed="false"><span class="icon-slot" data-icon="info"></span><span class="mobile-only">Summary</span></button>

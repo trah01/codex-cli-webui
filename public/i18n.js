@@ -4,6 +4,9 @@ export const LOCALE_PREFERENCES = Object.freeze(["system", "zh-CN", "en"]);
 const ZH_CN = Object.create(null);
 
 Object.assign(ZH_CN, {
+  "Verification code": "动态验证码",
+  "Single sign-on": "统一身份登录",
+  "Sign out": "退出登录",
   "Edit AGENTS.md": "编辑 AGENTS.md",
   "Close": "关闭",
   "Saved": "已保存",
