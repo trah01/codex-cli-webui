@@ -1,7 +1,8 @@
 import { applySessionDelta } from './session-delta.js';
+import { projectSessionPatch, projectSessionReply } from './session-output.js';
 
 function applyPatch(snapshot, patch) {
-  if (patch.delta) return { ...snapshot, thread: applySessionDelta(snapshot.thread, patch.delta) };
+  if (patch.delta) return { ...snapshot, thread: applySessionDelta(snapshot.thread, patch.delta, true) };
   const next = { ...snapshot };
   if (patch.thread) next.thread = { ...next.thread, ...patch.thread };
   if (patch.turn) {
@@ -32,8 +33,9 @@ export function createSessionClient({ rpc, onState, onError = () => {}, retryMs 
     if (!snapshot || event.epoch !== cursor?.epoch || event.seq !== cursor.seq + 1) {
       buffered.push(event); void activate(threadId, true); return;
     }
-    snapshot = applyPatch(snapshot, event.patch); cursor = { epoch: event.epoch, seq: event.seq };
-    onState(snapshot, event.patch, false);
+    const patch = projectSessionPatch(event.patch);
+    snapshot = applyPatch(snapshot, patch); cursor = { epoch: event.epoch, seq: event.seq };
+    onState(snapshot, patch, false);
   }
   async function activate(id, forceSnapshot = false) {
     clearTimeout(retry);
@@ -52,7 +54,7 @@ export function createSessionClient({ rpc, onState, onError = () => {}, retryMs 
       if (overflowed) { void activate(id, true); return; }
       const queued = buffered; buffered = []; loading = false;
       if (result.mode === 'snapshot') {
-        snapshot = result.snapshot; cursor = { epoch: result.epoch, seq: result.seq };
+        snapshot = projectSessionReply(result).snapshot; cursor = { epoch: result.epoch, seq: result.seq };
         onState(snapshot, null, true);
       } else if (result.mode === 'replay') {
         if (!snapshot || cursor?.epoch !== result.epoch) { void activate(id, true); return; }

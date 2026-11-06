@@ -3,6 +3,7 @@ import { SessionJournal } from './session-journal.js';
 import { reduceSessionNotification } from './session-reducer.js';
 import { validateImageInputs } from '../public/composer-input.js';
 import { sessionDelta } from '../public/session-delta.js';
+import { projectSessionPatch, projectSessionReply } from '../public/session-output.js';
 import { mergeStreamingTurn } from './session-items.js';
 import { withAsyncQuestions } from './async-user-input.js';
 
@@ -41,7 +42,7 @@ export class SessionService {
     const event = this.journal.append(entry, patch);
     if (patch.turn) this.turnOwners.set(patch.turn.id, id);
     for (const subscription of this.subscriptions.values()) if (subscription.threadId === id) {
-      try { subscription.send(event); } catch { /* The transport closes and removes its subscription. */ }
+      try { subscription.send({ ...event, patch: projectSessionPatch(event.patch) }); } catch { /* The transport closes and removes its subscription. */ }
     }
     return event;
   }
@@ -110,11 +111,11 @@ export class SessionService {
       await this.refresh(threadId);
       if (this.subscriptions.get(client) !== generation) return { mode: 'superseded' };
       this.poll(threadId);
-      return this.journal.read(this.entry(threadId), cursor);
+      return projectSessionReply(this.journal.read(this.entry(threadId), cursor));
     } catch (error) {
       const entry = this.entry(threadId);
       if (this.subscriptions.get(client) !== generation) return { mode: 'superseded' };
-      if (entry.seq) { this.publish(threadId, { requests: this.loadRequests(threadId) ?? entry.state.requests, queue: this.loadQueue(threadId) ?? entry.state.queue }); this.poll(threadId); return this.journal.read(entry, cursor); }
+      if (entry.seq) { this.publish(threadId, { requests: this.loadRequests(threadId) ?? entry.state.requests, queue: this.loadQueue(threadId) ?? entry.state.queue }); this.poll(threadId); return projectSessionReply(this.journal.read(entry, cursor)); }
       this.unsubscribe(client); throw error;
     }
   }

@@ -1,3 +1,5 @@
+import { limitCommandOutput } from './session-output.js';
+
 // A durable stream event carries only new text, rather than the growing turn.
 export function sessionDelta(method, params) {
   let field, index;
@@ -11,7 +13,7 @@ export function sessionDelta(method, params) {
   return { turnId: params.turnId, itemId: params.itemId, type: method.split('/')[1], field, ...(index !== undefined && { index }), text: params.delta };
 }
 
-export function applySessionDelta(thread, delta) {
+export function applySessionDelta(thread, delta, boundedOutput = false) {
   const turns = [...(thread.turns || [])], position = turns.findIndex(turn => turn.id === delta.turnId);
   const turn = position < 0 ? { id: delta.turnId, status: 'inProgress', items: [] } : { ...turns[position] };
   turn.items = [...(turn.items || [])];
@@ -22,7 +24,9 @@ export function applySessionDelta(thread, delta) {
     while (parts.length <= delta.index) parts.push('');
     parts[delta.index] += delta.text; item[delta.field] = parts;
   } else item[delta.field] = (item[delta.field] || '') + delta.text;
-  if (itemIndex < 0) turn.items.push(item); else turn.items[itemIndex] = item;
+  if (delta.outputTruncated) item.outputTruncated = true;
+  const nextItem = boundedOutput ? limitCommandOutput(item) : item;
+  if (itemIndex < 0) turn.items.push(nextItem); else turn.items[itemIndex] = nextItem;
   if (position < 0) turns.push(turn); else turns[position] = turn;
   return { ...thread, turns };
 }
